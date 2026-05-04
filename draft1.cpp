@@ -39,7 +39,6 @@ struct FusionRule {
     string hasilArcana;
 };
 
-
 vector<LevelUser> users = {
     {"ozora", "038", 10000, 2},
     {"igor", "444", 999999, 1}
@@ -113,7 +112,6 @@ bool skillSudahAda(const vector<string>& skills, string skillName) {
     return false;
 }
 
-
 bool konfirmasiFuse() {
     char jawaban;
 
@@ -165,13 +163,13 @@ vector<string> skillWarisan(persona parent1, persona parent2) {
     vector<string> semuaSkill;
     vector<string> skillDipilih;
 
-     // Ambil skill dari parent 1
+     
     for (int i = 0; i < parent1.skills.size(); i++) {
         if (!skillSudahAda(semuaSkill, parent1.skills[i])) {
             semuaSkill.push_back(parent1.skills[i]);
         }
     }
-    // Ambil skill dari parent 2
+    
     for (int i = 0; i < parent2.skills.size(); i++) {
         if (!skillSudahAda(semuaSkill, parent2.skills[i])) {
             semuaSkill.push_back(parent2.skills[i]);
@@ -186,8 +184,8 @@ vector<string> skillWarisan(persona parent1, persona parent2) {
 
     cout << "\n=== Pilih Skill Warisan ===" << endl;
 
-    // Menampilkan semua skill yang bisa diwariskan ke layar.
-    // ditampilkan pake nomor gituu dari 1 agar lebih mudah dipilih user.
+    
+    
     for (int i = 0; i < semuaSkill.size(); i++) {
         cout << i + 1 << ". " << semuaSkill[i] << endl;
     }
@@ -200,17 +198,17 @@ vector<string> skillWarisan(persona parent1, persona parent2) {
             throw out_of_range("nomor skill tidak ada di daftar");
         }
 
-        /* buat ngambil nama skill dari vector semuaSkill berdasarkan nomor yang dipilih user, kan Di dalam vector 
-        sebenarnya index-nya mulai dari 0 tuh, nah misal Kalau user pilih: pilihan = 1, Maka skill yang diambil harus: SemuaSkill[0].
-        makanya dikurang 1*/ 
+        
+
+ 
         string skill = semuaSkill[pilihan - 1];
 
-        // Mengecek supaya skill tidak dipilih dua kali.
+        
         if (skillSudahAda(skillDipilih, skill)) {
             throw invalid_argument("Skill Sudah Ada Pada persona!");
         }
         
-        // Memasukkan skill pilihan ke daftar skill warisan.
+        
         skillDipilih.push_back(skill);
         cout << "Skill berhasil ditambah!" << endl;
     }
@@ -275,7 +273,6 @@ int cariAtauBuatProfil(const string& username) {
     profilUser.push_back(newProfile);
     return profilUser.size() - 1;
 }
-
 
 void registerUser() {
     string namaBaru, passBaru;
@@ -719,7 +716,6 @@ void menuAdmin(LevelUser* userPtr) {
     } while (pilihan != 0);
 }
 
-
 void lihatPersonaUser(personaUser* profilePtr) { 
     if ((*profilePtr).listPersona.empty()) { 
         cout << "Tidak ada persona yang dilihat" << endl;
@@ -748,32 +744,32 @@ void beliPersona(LevelUser* userPtr, personaUser* profilePtr) {
 
         int index = cekInteger("Pilih nomor persona yang ingin dibeli (0 untuk batal) : ");
 
-        // Kalau user pilih 0, proses beli dibatalkan
+        
         if (index == 0) {
             cout << "batal membeli" << endl;
             return;
         }
 
-        // Nomor pilihan user dikurangi 1 karena index vector mulai dari 0
+        
         index--;
 
-        // Cek apakah nomor persona valid
+        
         if (index < 0 || index >= (int)personaUtama.size()) {
             throw out_of_range("Nomor persona tidak valid");
         }
 
-        // Cek uang user cukup atau tidak
+        
         if (userPtr->uang < personaUtama[index].harga) {
             throw runtime_error("Uang tidak cukup!");
         }
 
-        // Jika semua valid, persona dibeli
+        
         persona terbeli = personaUtama[index];
 
-        // Masukkan persona ke akun user
+        
         profilePtr->listPersona.push_back(terbeli);
 
-        // Kurangi uang user
+        
         userPtr->uang -= personaUtama[index].harga;
 
         cout << "persona berhasil dibeli! Sisa uang: " << userPtr->uang << endl;
@@ -786,10 +782,9 @@ void beliPersona(LevelUser* userPtr, personaUser* profilePtr) {
     }
 }
 
-
 void fusePersona(personaUser* profilePtr) { 
 
-    // Minimal user harus punya 2 persona untuk fusion
+    
     if (profilePtr->listPersona.size() < 2) { 
         cout << "Tidak ada persona yang bisa digabung (Minimal 2)" << endl;
         return;
@@ -797,15 +792,15 @@ void fusePersona(personaUser* profilePtr) {
     
     lihatPersonaUser(profilePtr); 
 
-    // deklarasi sekaligus input, sekalian manggil fungsi cekInteger
+    
     int p1 = cekInteger("masukkan persona pertama");
     int p2 = cekInteger("masukkan persona kedua");
 
-    // karna index vector dimulai dari 0 jd nomor inputan hrus dikurang 1 biar sesuai sm index vector yak
+    
     p1--;
     p2--;
 
-    // Validasi nomor persona
+    
     if (p1 < 0 || p1 >= profilePtr->listPersona.size() || 
         p2 < 0 || p2 >= profilePtr->listPersona.size() || 
         p1 == p2) { 
@@ -816,10 +811,10 @@ void fusePersona(personaUser* profilePtr) {
         persona parent1 = profilePtr->listPersona[p1];
         persona parent2 = profilePtr->listPersona[p2];
 
-        // Hitung target level hasil fusion
+        
         int targetLevel = (parent1.level + parent2.level) / 2 + 1;
 
-        // Cari hasil arcana dari kombinasi parent1 dan parent2
+        
         string hasilArcana = cariHasilArcana(parent1.arcana, parent2.arcana);
 
         if (hasilArcana == "") {
@@ -829,7 +824,7 @@ void fusePersona(personaUser* profilePtr) {
             return;
         }
 
-        // Buat cari persona hasil berdasarkan arcana hasil dan level terdekat
+        
         int indexHasil = cariPersonaFusionLevel(hasilArcana, targetLevel);
 
         if (indexHasil == -1) {
@@ -837,13 +832,13 @@ void fusePersona(personaUser* profilePtr) {
             return;
         }
 
-        // Ambil dulu data persona hasil fusion dari persona utama sblm warisin skill
+        
         persona hasilFusion = personaUtama[indexHasil];
 
-        // User wajib memilih skill warisan dari parent
+        
         vector<string> warisan = skillWarisan(parent1, parent2);
 
-        // Masukkan skill warisan ke persona hasil fusion
+        
         for (int i = 0; i < warisan.size(); i++) {
             if (!skillSudahAda(hasilFusion.skills, warisan[i]) &&
             hasilFusion.skills.size() < max_skill_persona) {
@@ -875,38 +870,35 @@ void fusePersona(personaUser* profilePtr) {
 
         cout << "====================================" << endl;
 
-        // Konfirmasi sebelum parent dihapus dan hasil fusion dimasukkan
+        
 
         if (!konfirmasiFuse()) {
             cout << "Penggabungan Arcana Dibatalkan." << endl;
             return;
         }
 
-        // Masukkan hasil fusion ke list persona user.  
+        
         profilePtr->listPersona.push_back(hasilFusion);
 
-        /*Hapus dua parent. Hapus index terbesar dulu. Kenapa? 
-        Karena kalau vector dihapus, posisi/index setelahnya akan bergeser maju.
-        begin = penunjuk ke posisi awal vector.
-        erase = sesuai nama lah ya buat hapus */ 
+        
+
+ 
 
         int maxIdx = max(p1, p2);
         int minIdx = min(p1, p2);
 
-        /*posisi data pertama di vector = .begin() + index
-        posisi data ke-index tertentu = .erase(.begin() + index) 
-        hapus data pada index itu. = .erase(.begin() + index) */
         
-        // hapus data dari listPersona pada posisi maxIdx
+
+        
+        
         profilePtr->listPersona.erase(profilePtr->listPersona.begin() + maxIdx);
 
-        // hapus data dari listPersona pada posisi minIdx
+        
         profilePtr->listPersona.erase(profilePtr->listPersona.begin() + minIdx);
 
         cout << "\nFusion berhasil!" << endl;
         cout << "Mendapatkan persona: " << hasilFusion.nama << endl;
 }
-
 
 void updateSkillUser(personaUser* profilePtr) { 
     if ((*profilePtr).listPersona.empty()) { 
