@@ -31,6 +31,7 @@ struct persona {
 struct personaUser {
     string user;
     vector<persona> listPersona; 
+    vector<string> inventorySkill;
 };
 
 struct FusionRule {
@@ -60,6 +61,8 @@ vector<persona> personaUtama = {
 vector<personaUser> profilUser;
 
 const vector<string> skillItems = {"masukunda", "dekaja", "debilitate", "charge", "concentrate"};
+
+vector<int> hargaSkill = {500, 600, 1000, 1200, 1500};
 
 vector<FusionRule> fusionRules = {
     {"fool", "magician", "hierophant"},
@@ -963,6 +966,42 @@ void hapusPersonaUser(personaUser* profilePtr) {
     }
 }
 
+void beliSkill(LevelUser* userPtr, personaUser* profilePtr) {
+    cout << "\n=== Daftar Skill Item ===" << endl;
+
+    for (int i = 0; i < skillItems.size(); i++) {
+        cout << i + 1 << ". " << skillItems[i] 
+             << " | Harga: " << hargaSkill[i] << endl;
+    }
+
+    int pilih = cekInteger("Pilih skill yang ingin dibeli (0 untuk batal): ");
+
+    if (pilih == 0) {
+        cout << "Batal membeli skill" << endl;
+        return;
+    }
+
+    pilih--;
+
+    if (pilih < 0 || pilih >= skillItems.size()) {
+        cout << "Pilihan tidak valid" << endl;
+        return;
+    }
+
+    if (userPtr->uang < hargaSkill[pilih]) {
+        cout << "Uang tidak cukup!" << endl;
+        return;
+    }
+
+    string skillDibeli = skillItems[pilih];
+
+    profilePtr->inventorySkill.push_back(skillDibeli);
+    userPtr->uang -= hargaSkill[pilih];
+
+    cout << "Skill berhasil dibeli!" << endl;
+    cout << "Sisa uang: " << userPtr->uang << endl;
+}
+
 void userMenu(int userIndex) { 
     int profilIndex = cariAtauBuatProfil(users[userIndex].nama);
 
@@ -980,6 +1019,7 @@ void userMenu(int userIndex) {
         cout << "5. Ubah skill persona" << endl;
         cout << "6. sorting persona" << endl;
         cout << "7. Hapus persona" << endl;
+        cout << "8. Beli skill item" << endl;
         cout << "0. Keluar" << endl;
         cout << "pilihan : ";
         pilihan = cekInteger("masukkan pilihan : ");
@@ -991,7 +1031,8 @@ void userMenu(int userIndex) {
             case 4: fusePersona(currentUserProfilePtr); break; 
             case 5: updateSkillUser(currentUserProfilePtr); break; 
             case 6: sortingPersona(&(currentUserProfilePtr->listPersona), &(currentUserPtr->status)); break; 
-            case 7: hapusPersonaUser(currentUserProfilePtr); break; 
+            case 7: hapusPersonaUser(currentUserProfilePtr); break;
+            case 8: beliSkill(currentUserPtr, currentUserProfilePtr); break; 
             case 0: cout << "Log out" << endl; break;
             default: cout << "pilihan tidak valid." << endl;
         }
