@@ -6,6 +6,7 @@
 #include <limits>
 #include <cctype>
 #include <stdexcept>
+#include <mysql/mysql.h>
 
 #define max_persona_user 10
 #define max_skill_persona 6
@@ -40,38 +41,16 @@ struct FusionRule {
     string hasilArcana;
 };
 
-vector<LevelUser> users = {
-    {"ozora", "038", 10000, 2},
-    {"igor", "444", 999999, 1}
-};
-
-vector<persona> personaUtama = {
-    {"orpheus", 10, "fool", {"agi", "dia", "bash", "tarunda"}, 500},
-    {"jack o lantern", 15, "magician", {"bufu", "pulinpa", "mabufu", "shock punch", "freeze boost", "magic boost"}, 750},
-    {"archangel", 20, "justice", {"kouha", "single shot", "baisudi", "sukukaja", "holy arrow", "apt pupil"}, 1000},
-
-    {"berith", 12, "hierophant", {"cleave", "rakukaja"}, 650},
-    {"pixie", 8, "priestess", {"dia", "zio"}, 400},
-    {"queen mab", 22, "empress", {"marin karin", "media"}, 1100},
-    {"nekomata", 18, "star", {"garu", "scratch"}, 900},
-    {"inugami", 21, "hanged", {"poison mist", "evil touch"}, 1050},
-    {"mitra", 25, "temperance", {"media", "makajama"}, 1250}
-};
+vector<LevelUser> users;
+vector<persona> personaUtama;
 
 vector<personaUser> profilUser;
 
-const vector<string> skillItems = {"masukunda", "dekaja", "debilitate", "charge", "concentrate"};
+vector<string> skillItems;
 
-vector<int> hargaSkill = {500, 600, 1000, 1200, 1500};
+vector<int> hargaSkill;
 
-vector<FusionRule> fusionRules = {
-    {"fool", "magician", "hierophant"},
-    {"fool", "priestess", "magician"},
-    {"fool", "empress", "star"},
-    {"magician", "priestess", "justice"},
-    {"magician", "empress", "hanged"},
-    {"priestess", "empress", "temperance"}
-};
+vector<FusionRule> fusionRules;
 
 string cariHasilArcana(string arcana1, string arcana2) {
     for (int i = 0; i < fusionRules.size(); i++) {
@@ -798,12 +777,10 @@ void fusePersona(personaUser* profilePtr) {
     
     int p1 = cekInteger("masukkan persona pertama");
     int p2 = cekInteger("masukkan persona kedua");
-
     
     p1--;
     p2--;
 
-    
     if (p1 < 0 || p1 >= profilePtr->listPersona.size() || 
         p2 < 0 || p2 >= profilePtr->listPersona.size() || 
         p1 == p2) { 
@@ -880,23 +857,13 @@ void fusePersona(personaUser* profilePtr) {
             return;
         }
 
-        
         profilePtr->listPersona.push_back(hasilFusion);
-
-        
-
- 
 
         int maxIdx = max(p1, p2);
         int minIdx = min(p1, p2);
 
-        
-
-        
-        
         profilePtr->listPersona.erase(profilePtr->listPersona.begin() + maxIdx);
 
-        
         profilePtr->listPersona.erase(profilePtr->listPersona.begin() + minIdx);
 
         cout << "\nFusion berhasil!" << endl;
@@ -1039,7 +1006,222 @@ void userMenu(int userIndex) {
     } while (pilihan != 0);
 }
 
+MYSQL* connectDB() {
+    MYSQL* conn = mysql_init(nullptr);
+
+    if (conn == nullptr) {
+        cerr << "mysql_init gagal" << endl;
+        exit(1);
+    }
+
+    MYSQL* result = mysql_real_connect(
+        conn,
+        "127.0.0.1",
+        "root",
+        "",
+        "persona",
+        3306,
+        nullptr,
+        0
+    );
+
+    if (result == nullptr) {
+        cerr << "Koneksi database gagal: " << mysql_error(conn) << endl;
+        mysql_close(conn);
+        exit(1);
+    }
+
+    return conn;
+}
+
+vector<persona> loadPersonaFromDB(MYSQL* conn) {
+    vector<persona> daftar;
+
+    string query =
+        "SELECT p.id, p.nama, p.level, a.nama_arcana, p.harga "
+        "FROM persona p "
+        "JOIN arcana_master a ON p.arcana_id = a.id "
+        "ORDER BY p.id";
+
+    if (mysql_query(conn, query.c_str())) {
+        cerr << "Query persona gagal: " << mysql_error(conn) << endl;
+        return daftar;
+    }
+
+    MYSQL_RES* res = mysql_store_result(conn);
+
+    if (res == nullptr) {
+        cerr << "Ambil data persona gagal: " << mysql_error(conn) << endl;
+        return daftar;
+    }
+
+    MYSQL_ROW row;
+
+    while ((row = mysql_fetch_row(res))) {
+        int personaId = stoi(row[0]);
+
+        persona p;
+        p.nama = row[1];
+        p.level = stoi(row[2]);
+        p.arcana = row[3];
+        p.harga = stoi(row[4]);
+
+        string skillQuery =
+            "SELECT s.nama_skill "
+            "FROM persona_skills ps "
+            "JOIN skill_master s ON ps.skill_id = s.id "
+            "WHERE ps.persona_id = " + to_string(personaId) + " "
+            "ORDER BY ps.skill_id";
+
+        if (mysql_query(conn, skillQuery.c_str())) {
+            cerr << "Query skill gagal: " << mysql_error(conn) << endl;
+        } else {
+            MYSQL_RES* skillRes = mysql_store_result(conn);
+            MYSQL_ROW skillRow;
+
+            while ((skillRow = mysql_fetch_row(skillRes))) {
+                p.skills.push_back(skillRow[0]);
+            }
+
+            mysql_free_result(skillRes);
+        }
+
+        daftar.push_back(p);
+    }
+
+    mysql_free_result(res);
+
+    return daftar;
+}
+
+vector<LevelUser> loadUsersFromDB(MYSQL* conn) {
+    vector<LevelUser> daftar;
+
+    string query =
+        "SELECT nama_user, password, uang, status "
+        "FROM users "
+        "ORDER BY id";
+
+    if (mysql_query(conn, query.c_str())) {
+        cerr << "Query users gagal: " << mysql_error(conn) << endl;
+        return daftar;
+    }
+
+    MYSQL_RES* res = mysql_store_result(conn);
+
+    if (res == nullptr) {
+        cerr << "Ambil data users gagal: " << mysql_error(conn) << endl;
+        return daftar;
+    }
+
+    MYSQL_ROW row;
+
+    while ((row = mysql_fetch_row(res))) {
+        LevelUser u;
+        u.nama = row[0];
+        u.password = row[1];
+        u.uang = stoi(row[2]);
+
+        string statusDB = row[3];
+
+        if (statusDB == "admin") {
+            u.status = 1;
+        } else {
+            u.status = 2;
+        }
+
+        daftar.push_back(u);
+    }
+
+    mysql_free_result(res);
+
+    return daftar;
+}
+
+void loadSkillShopFromDB(MYSQL* conn) {
+    skillItems.clear();
+    hargaSkill.clear();
+
+    string query =
+        "SELECT sm.nama_skill, scs.harga "
+        "FROM skill_card_shop scs "
+        "JOIN skill_master sm ON scs.skill_id = sm.id "
+        "ORDER BY scs.id";
+
+    if (mysql_query(conn, query.c_str())) {
+        cerr << "Query skill shop gagal: " << mysql_error(conn) << endl;
+        return;
+    }
+
+    MYSQL_RES* res = mysql_store_result(conn);
+
+    if (res == nullptr) {
+        cerr << "Ambil data skill shop gagal: " << mysql_error(conn) << endl;
+        return;
+    }
+
+    MYSQL_ROW row;
+
+    while ((row = mysql_fetch_row(res))) {
+        skillItems.push_back(row[0]);
+        hargaSkill.push_back(stoi(row[1]));
+    }
+
+    mysql_free_result(res);
+}
+
+vector<FusionRule> loadFusionRulesFromDB(MYSQL* conn) {
+    vector<FusionRule> daftar;
+
+    string query =
+        "SELECT a1.nama_arcana, a2.nama_arcana, ah.nama_arcana "
+        "FROM arcana_fusion_matrix afm "
+        "JOIN arcana_master a1 ON afm.arcana_1 = a1.id "
+        "JOIN arcana_master a2 ON afm.arcana_2 = a2.id "
+        "JOIN arcana_master ah ON afm.result_arcana = ah.id";
+
+    if (mysql_query(conn, query.c_str())) {
+        cerr << "Query fusion rules gagal: " << mysql_error(conn) << endl;
+        return daftar;
+    }
+
+    MYSQL_RES* res = mysql_store_result(conn);
+
+    if (res == nullptr) {
+        cerr << "Ambil data fusion rules gagal: " << mysql_error(conn) << endl;
+        return daftar;
+    }
+
+    MYSQL_ROW row;
+
+    while ((row = mysql_fetch_row(res))) {
+        FusionRule f;
+        f.arcana1 = row[0];
+        f.arcana2 = row[1];
+        f.hasilArcana = row[2];
+
+        daftar.push_back(f);
+    }
+
+    mysql_free_result(res);
+
+    return daftar;
+}
+
 int main() {
+    MYSQL* conn = connectDB();
+
+    users = loadUsersFromDB(conn);
+    personaUtama = loadPersonaFromDB(conn);
+    loadSkillShopFromDB(conn);
+    fusionRules = loadFusionRulesFromDB(conn);
+
+    cout << "Data berhasil diload dari database." << endl;
+    cout << "Jumlah user: " << users.size() << endl;
+    cout << "Jumlah persona: " << personaUtama.size() << endl;
+    cout << "Jumlah skill shop: " << skillItems.size() << endl;
+    cout << "Jumlah fusion rule: " << fusionRules.size() << endl;
+
     int currentUserIndex = -1;
     while (true) {
         cout << "\n=== SELAMAT DATANG DI VELVET ROOM ===" << endl;
@@ -1062,11 +1244,13 @@ int main() {
                     cout << "status user tidak dikenali." << endl;
                 }
             }
+
         } else if (pilihanUtama == 2) {
             registerUser();
         } else {
             cout << "pilihan tidak valid." << endl;
         }
     }
+    mysql_close(conn);
     return 0;
 }
