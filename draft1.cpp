@@ -1208,6 +1208,53 @@ vector<FusionRule> loadFusionRulesFromDB(MYSQL* conn) {
     return daftar;
 }
 
+bool panggilPersona(MYSQL* conn) {
+    const char* query = "SELECT p.id, p.nama, p.level, a.nama_arcana, p.harga, sm.nama_skill "
+                        "FROM persona AS p "
+                        "JOIN arcana_master AS a ON p.arcana_id = a.id "
+                        "LEFT JOIN persona_skills AS ps ON p.id = ps.persona_id "
+                        "LEFT JOIN skill_master AS sm ON ps.skill_id = sm.id "
+                        "ORDER BY p.id ASC";
+
+    if (mysql_query(conn, query)) {
+        cout << "Gagal Select: " << mysql_error(conn) << endl;
+        return false;
+    }
+
+    MYSQL_RES* res = mysql_store_result(conn);
+    if (res == NULL) {
+        cout << "Gagal Store Result: " << mysql_error(conn) << endl;
+        return false;
+    }
+
+    MYSQL_ROW row;
+    int current_persona_id = -1; 
+
+    while ((row = mysql_fetch_row(res))) {
+        int persona_id = atoi(row[0]);
+
+        if (persona_id != current_persona_id) {
+            if (current_persona_id != -1) cout << endl;
+            
+            cout << "\n====== " << row[1] << " ======" << endl; 
+            cout << "Level    : " << row[2] << endl;           
+            cout << "Arcana   : " << row[3] << endl;          
+            cout << "Harga    : " << row[4] << endl;           
+            cout << "Skills   : ";
+            
+            current_persona_id = persona_id;
+        }
+
+        if (row[5] != NULL) {
+            cout << row[5] << ", ";
+        }
+    }
+
+    cout << endl; 
+    mysql_free_result(res);
+    return true;
+}
+
 int main() {
     MYSQL* conn = connectDB();
 
@@ -1219,7 +1266,7 @@ int main() {
     cout << "Data berhasil diload dari database." << endl;
     cout << "Jumlah user: " << users.size() << endl;
     cout << "Jumlah persona: " << personaUtama.size() << endl;
-    cout << "Jumlah skill shop: " << skillItems.size() << endl;
+    cout << "Jumlah skill: " << skillItems.size() << endl;
     cout << "Jumlah fusion rule: " << fusionRules.size() << endl;
 
     int currentUserIndex = -1;
@@ -1251,6 +1298,9 @@ int main() {
             cout << "pilihan tidak valid." << endl;
         }
     }
+
+    panggilPersona(conn);
+
     mysql_close(conn);
     return 0;
 }
