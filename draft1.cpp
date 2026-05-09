@@ -13,6 +13,7 @@
 #define max_skill_warisan 2
 using namespace std;
 
+
 struct LevelUser {
     string nama;
     string password;
@@ -40,6 +41,8 @@ struct FusionRule {
     string arcana2;
     string hasilArcana;
 };
+
+string escapeSQL(MYSQL* conn, const string& input);
 
 vector<LevelUser> users;
 vector<persona> personaUtama;
@@ -256,8 +259,9 @@ int cariAtauBuatProfil(const string& username) {
     return profilUser.size() - 1;
 }
 
-void registerUser() {
+void registerUser(MYSQL* conn) {
     string namaBaru, passBaru;
+
     cout << "\n=== Registrasi user baru ===" << endl;
     cout << "masukkan nama user : ";
     cin >> namaBaru;
@@ -270,14 +274,28 @@ void registerUser() {
     cout << "masukkan password : ";
     cin >> passBaru;
 
+    string namaEsc = escapeSQL(conn, namaBaru);
+    string passEsc = escapeSQL(conn, passBaru);
+
+    string query =
+        "INSERT INTO users (nama_user, password, uang, status) VALUES ('" +
+        namaEsc + "', '" +
+        passEsc + "', 10000, 'user')";
+
+    if (mysql_query(conn, query.c_str())) {
+        cout << "Gagal registrasi ke database: " << mysql_error(conn) << endl;
+        return;
+    }
+
     LevelUser newUser;
     newUser.nama = namaBaru;
     newUser.password = passBaru;
-    newUser.uang = 10000; 
-    newUser.status = 2;   
+    newUser.uang = 10000;
+    newUser.status = 2;
 
     users.push_back(newUser);
-    cout << "registrasi berhasil " << endl;
+
+    cout << "registrasi berhasil dan masuk ke database!" << endl;
 }
 
 bool login(int& userIndex) {
@@ -522,7 +540,94 @@ void lihatPersonaUtama() {
     }
 }
 
-void tambahPersona() {
+// helper escape string 
+
+/*Note: 
+c_str() itu fungsi bawaan dari std::string di C++. Gunanya: mengubah string C++ menjadi bentuk C-style string, yaitu const char*.
+Di C++, kalau kamu bikin tempat penyimpanan sementara pakai new, kamu wajib menghapusnya sendiri pakai delete[].
+Fungsi mysql_real_escape_string() adalah fungsi bawaan MySQL/MariaDB. Tugasnya: mengamankan teks dari karakter yang bisa merusak query SQL, seperti: ', ", \.
+Isi parameternya: koneksi database
+*/
+string escapeSQL(MYSQL* conn, const string& input) {
+    // buat dlu tempat penyimpanan sementara bernama buffer, ukurannya input.length() * 2 + 1 karena hasil escape bisa lebih panjang dari teks asli.
+    char* buffer = new char[input.length()* 2 + 1];
+    // input.c_str() isi input dalam bentuk C-style string, karena fungsi MySQL ini butuh const char*, bukan std::string.
+    /*input.length() panjang teks input. Misalnya input: Jack O'Lantern hasil di buffer bisa jadi: Jack O\'Lantern*/
+    mysql_real_escape_string(conn, buffer, input.c_str(), input.length());
+    string hasil(buffer);
+    /*Menghapus memori yang tadi dibuat dengan: new char[] Karena buffer dibuat manual, maka harus dihapus manual juga. Kalau tidak dihapus, bisa terjadi memory leak.*/
+    delete[] buffer;
+    return hasil;
+}
+
+/*Tambahkan helper ambil/buat arcana
+Kalau arcana belum ada, fungsi ini akan otomatis masukin ke arcana_master.*/
+int createArcana(MYSQL* conn, const string& arcanaName) {
+    // Mengamankan teks arcanaName sebelum dimasukkan ke query SQL.
+    string arcanaEsc = escapeSQL(conn, arcanaName);
+    string selectQuery =  "SELECT id FROM arcana_master WHERE nama_arcana = '" + arcanaEsc + "' LIMIT 1";
+    /*Contoh kalau arcanaEsc = "fool", maka query-nya jadi: SELECT id FROM arcana_master WHERE nama_arcana = 'fool' LIMIT 1;*/
+    if (mysql_query(conn, selectQuery.c_str())) {
+        cout << "Gagal mencari Arcana: " << mysql_error(conn) << endl;
+        return -1;
+    }
+    /*Menjalankan query selectQuery ke database. selectQuery itu tipe C++ string. Tapi mysql_query() butuh const char*, jadi dipakai: selectQuery.c_str()
+    Kalau query gagal, mysql_query() mengembalikan nilai bukan 0, sehingga masuk ke blok if.*/
+    MYSQL_RES* res = mysql_store_result(conn);
+    /*Mengambil hasil query SELECT tadi dan menyimpannya ke variabel res. res ini berisi hasil tabel dari query.*/
+    MYSQL_ROW row = mysql_fetch_row(res);
+    /*Mengambil satu baris pertama dari hasil query. Kalau arcana ditemukan, row berisi data. Kalau tidak ditemukan, row bernilai NULL.*/
+    if(row) {
+        int id = atoi(row[0]);
+        mysql_free_result(res);
+        return(id);
+        //atoi itu fungsi C/C++ buat mengubah teks angka menjadi integer.
+    }
+
+    // Menghapus/membersihkan hasil query dari memori. Setiap kali pakai mysql_store_result(), sebaiknya dibersihkan supaya tidak boros memori.
+    mysql_free_result(res);
+    string insertQuery = "INSERT INTO arcana_master (nama_arcana) VALUES ('" + arcanaEsc + "')";
+
+    if (mysql_query(conn, insertQuery.c_str())) {
+        cout << "Gagal menambah arcana: " << mysql_error(conn) << endl;
+        return -1;
+    }
+    return(int)mysql_insert_id(conn);
+}
+
+int getOrCreateSkill(MYSQL* conn, const string& skillName) {
+    string skillEsc = escapeSQL(conn, skillName);
+
+    string selectQuery =  "SELECT id FROM skill_master WHERE nama_skill = '" + skillEsc + "' LIMIT 1";
+    
+    if(mysql_query(conn, selectQuery.c_str())) {
+        cout << "Gagal mencari Skill Arcana: " << mysql_error(conn) << endl;
+        return -1;
+    }
+    MYSQL_RES* res = mysql_store_result(conn);
+    MYSQL_ROW row = mysql_fetch_row(res);
+
+    if (row) {
+        int id = atoi(row[0]);
+        // Menghapus/membersihkan hasil query dari memori. Setiap kali pakai mysql_store_result(), sebaiknya dibersihkan dengan:
+        mysql_free_result(res);
+        return(id);
+    }
+
+    mysql_free_result(res);
+    string insertQuery = "INSERT INTO skill_master (nama_skill) VALUES ('" + skillEsc + "')";
+
+    if (mysql_query(conn, insertQuery.c_str())) {
+        cout << "Gagal Menambah Skill: " << mysql_error(conn) << endl;
+        return -1;
+    }
+
+    // Kalau insert berhasil, ambil id terakhir yang baru dibuat oleh database.
+    return(int)mysql_insert_id(conn);
+
+}
+
+void tambahPersona(MYSQL* conn) {
 
     persona newP;
     cout << "masukkan nama persona : ";
@@ -535,29 +640,86 @@ void tambahPersona() {
     }
 
     newP.level = cekInteger("masukkan level persona : ");
-    cout << "masukkan arcana persona : ";
+
+    cout << "masukkan skill persona, minimal 2 maksimal 4:" << endl;
     cin >> newP.arcana;
 
-    cout << "masukkan skill persona (ketik 'stop' untuk berhenti):" << endl;
     clearInputBuffer();
-    while (newP.skills.size() < 8) {
+
+    while (newP.skills.size() < 4) {
         string inputSkill;
         cout << "Skill " << (newP.skills.size() + 1) << ": ";
         getline(cin, inputSkill);
-        if (inputSkill == "stop") break;
 
+        if (inputSkill == "stop") {
+            if (newP.skills.size() >= 2) {
+                break;
+            }
+            else {
+                cout << "Minimal skill harus 2!" << endl;
+                continue;
+            }
+        }
         if (cekSkillPersona(newP.skills, inputSkill)) {
-            cout << "Skill tersebut sudah ada di persona ini, abaikan." << endl;
-        } else {
+                cout << "Skill tersebut sudah ada di persona ini, abaikan." << endl;
+        }
+        else {
             newP.skills.push_back(inputSkill);
         }
     }
 
-    newP.harga = cekInteger("masukkan harga persona : ");
 
+    newP.harga = cekInteger("masukkan harga persona : ");
+    
+    mysql_query(conn, "Start Transaction");
+    
+    int arcanaId = createArcana(conn, newP.arcana);
+    if (arcanaId == -1) {
+        mysql_query(conn, "ROLLBACK");
+        cout << "Gagal Menambah Persona" << endl;
+        return; 
+    }
+
+    string namaEsc = escapeSQL(conn, newP.nama);
+    string insertPersona = "INSERT INTO persona (nama, level, harga, isSpecial, arcana_id) VALUES ('" + namaEsc + "', " +
+                            to_string(newP.level) + ", " +
+                            to_string(newP.harga) + ", 0, " +
+                            to_string(arcanaId) + ")";
+    if (mysql_query(conn, insertPersona.c_str())) {
+        cout << "Gagal Menambah Persona: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    int personaId = (int)mysql_insert_id(conn);
+
+    // Untuk setiap skill yang ada di newP.skills, ambil satu per satu, lalu cari/buat ID skill-nya di database.
+    for (const string& skill : newP.skills) {
+        int skillId = getOrCreateSkill(conn, skill);
+
+        if (skillId == -1) {
+            mysql_query(conn, "ROLLBACK");
+            cout << "Gagal Menambah Persona: " << endl;
+            return;
+        }
+
+        string insertSkill = "INSERT INTO persona_skills (persona_id, skill_id) VALUES (" +
+                              to_string(personaId) + ", " +
+                              to_string(skillId) + ")";
+
+        if (mysql_query(conn, insertSkill.c_str())) {
+            cout << "Gagal Menambah Skill Persona: " << mysql_error(conn) << endl;
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+    }
+    
+    mysql_query(conn, "COMMIT");
     personaUtama.push_back(newP);
-    cout << "Data persona berhasil dimasukkan" << endl;
+
+    cout << "Data persona berhasil dimasukkan ke database!" << endl;
 }
+
 
 void updatePersona() {
     if (personaUtama.empty()) {
@@ -671,7 +833,7 @@ void hapusPersona() {
     }
 }
 
-void menuAdmin(LevelUser* userPtr) {
+void menuAdmin(LevelUser* userPtr, MYSQL* conn) {
     int pilihan;
     do {
         cout << "\n= Menu Velvet Room Admin =" << endl;
@@ -684,14 +846,20 @@ void menuAdmin(LevelUser* userPtr) {
         cout << "0. Keluar" << endl;
         pilihan = cekInteger("pilihan : ");
         switch (pilihan) {
-            case 1: lihatPersonaUtama(); break;
-            case 2: cariPersona(&personaUtama, &(userPtr->status)); break;
-            case 3: tambahPersona(); break;
-            case 4: updatePersona(); break;
-            case 5: hapusPersona(); break;
-            case 6: sortingPersona(&personaUtama, &(userPtr->status)); break;
+            case 1: lihatPersonaUtama(); 
+                break;
+            case 2: cariPersona(&personaUtama, &(userPtr->status)); 
+                break;
+            case 3: tambahPersona(conn); 
+                break;
+            case 4: updatePersona(); 
+                break;
+            case 5: hapusPersona(); 
+                break;
+            case 6: sortingPersona(&personaUtama, &(userPtr->status)); 
+                break;
             case 0:
-                cout << "Log out.... " << (*userPtr).nama << endl; 
+                cout << "Logout " << (*userPtr).nama << endl; 
                 break;
             default: cout << "pilihan tidak valid." << endl;
         }
@@ -1284,7 +1452,7 @@ int main() {
                 LevelUser* loggedUserPtr = &users[currentUserIndex];
 
                 if (loggedUserPtr->status == 1) { 
-                    menuAdmin(loggedUserPtr); 
+                    menuAdmin(loggedUserPtr, conn); 
                 } else if (loggedUserPtr->status == 2) { 
                     userMenu(currentUserIndex);
                 } else {
@@ -1293,7 +1461,7 @@ int main() {
             }
 
         } else if (pilihanUtama == 2) {
-            registerUser();
+            registerUser(conn);
         } else {
             cout << "pilihan tidak valid." << endl;
         }
