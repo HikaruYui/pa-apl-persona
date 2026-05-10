@@ -15,6 +15,7 @@ using namespace std;
 
 
 struct LevelUser {
+    int id;
     string nama;
     string password;
     int uang;
@@ -22,6 +23,7 @@ struct LevelUser {
 };
 
 struct persona {
+    int id;
     string nama;
     int level;
     string arcana;
@@ -43,6 +45,7 @@ struct FusionRule {
 };
 
 string escapeSQL(MYSQL* conn, const string& input);
+void loadUserPersonaCollectionFromDB(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr);
 
 vector<LevelUser> users;
 vector<persona> personaUtama;
@@ -282,12 +285,16 @@ void registerUser(MYSQL* conn) {
         namaEsc + "', '" +
         passEsc + "', 10000, 'user')";
 
+
     if (mysql_query(conn, query.c_str())) {
         cout << "Gagal registrasi ke database: " << mysql_error(conn) << endl;
         return;
     }
 
+    int userId = (int)mysql_insert_id(conn);
+
     LevelUser newUser;
+    newUser.id = userId;
     newUser.nama = namaBaru;
     newUser.password = passBaru;
     newUser.uang = 10000;
@@ -442,7 +449,6 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
     cout << "\npilih jenis pencarian : " << endl;
     cout << "1. berdasarkan nama" << endl;
     cout << "2. berdasarkan level" << endl;
-    cout << "pilihan : ";
     int pilihan = cekInteger("pilihan : ");
 
     switch (pilihan) {
@@ -528,7 +534,7 @@ void lihatPersonaUtama() {
         return;
     }
     for (size_t i = 0; i < personaUtama.size(); ++i) {
-        cout << "\n====== " << i + 1 << personaUtama[i].nama << " ======" << endl;
+        cout << "\n====== " << i + 1 << " " <<personaUtama[i].nama << " ======" << endl;
         cout << "Level    : " << personaUtama[i].level << endl;
         cout << "Arcana   : " << personaUtama[i].arcana << endl;
         cout << "Skill    : ";
@@ -641,7 +647,7 @@ void tambahPersona(MYSQL* conn) {
 
     newP.level = cekInteger("masukkan level persona : ");
 
-    cout << "masukkan skill persona, minimal 2 maksimal 4:" << endl;
+    cout << "Silakan masukkan arcana persona: " << endl;
     cin >> newP.arcana;
 
     clearInputBuffer();
@@ -692,6 +698,7 @@ void tambahPersona(MYSQL* conn) {
     }
 
     int personaId = (int)mysql_insert_id(conn);
+    newP.id = personaId;
 
     // Untuk setiap skill yang ada di newP.skills, ambil satu per satu, lalu cari/buat ID skill-nya di database.
     for (const string& skill : newP.skills) {
@@ -721,7 +728,7 @@ void tambahPersona(MYSQL* conn) {
 }
 
 
-void updatePersona() {
+void updatePersona(MYSQL* conn) {
     if (personaUtama.empty()) {
         cout << "Tidak ada persona yang bisa diubah" << endl;
         return;
@@ -729,93 +736,132 @@ void updatePersona() {
 
     lihatPersonaUtama();
 
-    int index;
-    cout << "masukkan nomor persona yang ingin diubah: ";
-    cin >> index;
+    int index = cekInteger("Silakan masukkan nomor persona yang ingin diubah: ");
 
-    if (index - 1 >= 0 && index - 1 < (int)personaUtama.size()) {
-        int idx = index - 1;
-        int pilihan;
-        do {
-            cout << "\n--- Update persona: " << personaUtama[idx].nama << " ---" << endl;
-            cout << "1. Ubah nama persona" << endl;
-            cout << "2. Ubah level persona" << endl;
-            cout << "3. Ubah arcana persona" << endl;
-            cout << "4. Ubah skill persona" << endl;
-            cout << "5. Ubah harga persona" << endl;
-            cout << "0. Batal update" << endl;
-            cout << "pilihan: ";
-            cin >> pilihan;
-    
-            switch (pilihan) {
-            case 1: {
-                string namaBaru;
-                cout << "masukkan nama baru : ";
-                clearInputBuffer();
-                getline(cin, namaBaru);
-                if (cekNamaPersona(namaBaru, idx)) {
-                    cout << "Gagal: Nama persona sudah ada!" << endl;
-                } else {
-                    personaUtama[idx].nama = namaBaru;
-                    cout << "Berhasil diubah" << endl;
-                }
-                break;
-            }
-            case 2:
-                personaUtama[idx].level = cekInteger("masukkan level persona : ");
-                cout << "Berhasil diubah" << endl;
-                break;
-            case 3:
-                cout << "masukkan arcana baru : ";
-                cin >> personaUtama[idx].arcana;
-                cout << "Berhasil diubah" << endl;
-                break;
-            case 4: {
-                if (personaUtama[idx].skills.empty()) {
-                    cout << "Tidak ada skill untuk diubah" << endl;
-                    break;
-                }
-                for (size_t j = 0; j < personaUtama[idx].skills.size(); ++j) {
-                    cout << "Skill ke " << (j + 1) << " : " << personaUtama[idx].skills[j] << endl;
-                }
-                int idxSkill = cekInteger("nomor skill yang ingin diubah : ");
-                if (idxSkill >= 1 && idxSkill <= (int)personaUtama[idx].skills.size()) {
-                    clearInputBuffer();
-                    string skillBaru;
-                    cout << "masukkan skill baru : ";
-                    getline(cin, skillBaru);
-                    
-                    if (cekSkillPersona(personaUtama[idx].skills, skillBaru, idxSkill - 1)) {
-                        cout << "Gagal: Skill sudah ada di persona ini!" << endl;
-                    } else {
-                        personaUtama[idx].skills[idxSkill - 1] = skillBaru;
-                        cout << "Skill berhasil diubah" << endl;
-                    }
-                } else {
-                    cout << "Nomor skill tidak valid" << endl;
-                }
-                break;
-            }
-            case 5:
-                personaUtama[idx].harga = cekInteger("masukkan harga persona baru : ");
-                cout << "Berhasil diubah" << endl;
-                break;
-            case 0:
-                cout << "Batal update" << endl;
-                break;
-            default:
-                cout << "pilihan tidak valid" << endl;
-            }
-        } while (pilihan != 0);
-
-    }else{
-        cout << "Nomor tidak valid" << endl;
-        return; 
+    if (index < 1 || index > (int)personaUtama.size()) {
+        cout << "Nomor Tidak Valid" << endl;
+        return;
     }
 
+    int idx = index - 1;
+    int personaId = personaUtama[idx].id;
+    int pilihan;
+
+    do {
+        cout << "\n--- Update persona: " << personaUtama[idx].nama << " ---" << endl;
+        cout << "1. Ubah nama persona" << endl;
+        cout << "2. Ubah level persona" << endl;
+        cout << "3. Ubah arcana persona" << endl;
+        cout << "4. Ubah skill persona" << endl;
+        cout << "5. Ubah harga persona" << endl;
+        cout << "0. Batal update" << endl;
+        cout << "pilihan: ";
+        cin >> pilihan;
+
+        switch (pilihan) {
+        case 1: {
+            string namaBaru;
+            cout << "Silakan masukkan nama baru : ";
+            clearInputBuffer();
+            getline(cin, namaBaru);
+
+            if (cekNamaPersona(namaBaru, idx)) {
+                cout << "Gagal: Nama persona sudah ada!" << endl;
+                break;
+            }
+
+            string namaEsc = escapeSQL(conn, namaBaru);
+
+            string query =
+                "UPDATE persona SET nama = '" + namaEsc +
+                "' WHERE id = " + to_string(personaId);
+
+            if (mysql_query(conn, query.c_str())) {
+                cout << "Gagal update nama di database: " << mysql_error(conn) << endl;
+                break;
+            }
+
+            personaUtama[idx].nama = namaBaru;
+            cout << "Nama berhasil diubah!" << endl;
+            break;
+        }
+
+        case 2: {
+            int levelBaru = cekInteger("Silakan masukkan level persona: ");
+
+            string query =
+                "UPDATE persona SET level = " + to_string(levelBaru) +
+                " WHERE id = " + to_string(personaId);
+
+            if (mysql_query(conn, query.c_str())) {
+                cout << "Gagal update level: " << mysql_error(conn) << endl;
+                break;
+            }
+
+            personaUtama[idx].level = levelBaru;
+            cout << "Level berhasil diubah" << endl;
+            break;
+        }
+
+        case 3: {
+            string arcanaBaru;
+            cout << "Silakan masukkan arcana baru : ";
+            cin >> arcanaBaru;
+
+            int arcanaId = createArcana(conn, arcanaBaru);
+
+            if (arcanaId == -1) {
+                cout << "Gagal mendapatkan ID arcana" << endl;
+                break;
+            }
+
+            string query =
+                "UPDATE persona SET arcana_id = " + to_string(arcanaId) +
+                " WHERE id = " + to_string(personaId);
+
+            if (mysql_query(conn, query.c_str())) {
+                cout << "Gagal mengupdate arcana: " << mysql_error(conn) << endl;
+                break;
+            }
+
+            personaUtama[idx].arcana = arcanaBaru;
+            cout << "Arcana berhasil diubah!" << endl;
+            break;
+        }
+
+        case 4: {
+            cout << "Update skill persona ke database dikerjakan setelah ini." << endl;
+            break;
+        }
+
+        case 5: {
+            int hargaBaru = cekInteger("Masukkan harga persona baru: ");
+
+            string query =
+                "UPDATE persona SET harga = " + to_string(hargaBaru) + " WHERE id = " + to_string(personaId);
+
+            if (mysql_query(conn, query.c_str())) {
+                cout << "Gagal mengupdate harga: " << mysql_error(conn) << endl;
+                break;
+            }
+
+            personaUtama[idx].harga = hargaBaru;
+            cout << "Harga berhasil diubah!" << endl;
+            break;
+        }
+
+        case 0:
+            cout << "Batal update" << endl;
+            break;
+
+        default:
+            cout << "pilihan tidak valid" << endl;
+        }
+
+    } while (pilihan != 0);
 }
 
-void hapusPersona() {
+void hapusPersona(MYSQL* conn) {
     if (personaUtama.empty()) {
         cout << "Tidak ada persona yang bisa dihapus" << endl;
         return;
@@ -823,14 +869,51 @@ void hapusPersona() {
 
     lihatPersonaUtama();
 
-    int index = cekInteger("masukkan nomor persona yang ingin dihapus : ");
+    int index = cekInteger("Silakan masukkan nomor persona yang ingin dihapus: ");
 
-    if (index >= 1 && index <= (int)personaUtama.size()) {
-        personaUtama.erase(personaUtama.begin() + (index - 1));
-        cout << "persona berhasil dihapus" << endl;
-    } else {
+    if (index < 1 || index > (int)personaUtama.size()) {
         cout << "Tidak ada persona di nomor itu" << endl;
+        return;
     }
+
+    int idx = index - 1;
+    int personaId = personaUtama[idx].id;
+
+    char konfirmasi;
+    cout << "Apakah kamu yakin ingin menghapus persona " 
+         << personaUtama[idx].nama << "? y/n: ";
+    cin >> konfirmasi;
+
+    if (konfirmasi != 'y' && konfirmasi != 'Y') {
+        cout << "Hapus persona dibatalkan" << endl;
+        return;
+    }
+
+    mysql_query(conn, "START TRANSACTION");
+
+    string deleteSkill =
+        "DELETE FROM persona_skills WHERE persona_id = " + to_string(personaId);
+
+    if (mysql_query(conn, deleteSkill.c_str())) {
+        cout << "Gagal menghapus skill persona: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    string deletePersona =
+        "DELETE FROM persona WHERE id = " + to_string(personaId);
+
+    if (mysql_query(conn, deletePersona.c_str())) {
+        cout << "Gagal menghapus persona: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_query(conn, "COMMIT");
+
+    personaUtama.erase(personaUtama.begin() + idx);
+
+    cout << "Persona berhasil dihapus dari database!" << endl;
 }
 
 void menuAdmin(LevelUser* userPtr, MYSQL* conn) {
@@ -852,9 +935,9 @@ void menuAdmin(LevelUser* userPtr, MYSQL* conn) {
                 break;
             case 3: tambahPersona(conn); 
                 break;
-            case 4: updatePersona(); 
+            case 4: updatePersona(conn); 
                 break;
-            case 5: hapusPersona(); 
+            case 5: hapusPersona(conn); 
                 break;
             case 6: sortingPersona(&personaUtama, &(userPtr->status)); 
                 break;
@@ -884,7 +967,7 @@ void lihatPersonaUser(personaUser* profilePtr) {
     }
 }
 
-void beliPersona(LevelUser* userPtr, personaUser* profilePtr) {
+void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     try {
         if (profilePtr->listPersona.size() >= max_persona_user) {
             throw out_of_range("Batas maksimum persona sudah tercapai");
@@ -900,27 +983,47 @@ void beliPersona(LevelUser* userPtr, personaUser* profilePtr) {
             return;
         }
 
-        
         index--;
-
         
         if (index < 0 || index >= (int)personaUtama.size()) {
             throw out_of_range("Nomor persona tidak valid");
         }
 
-        
+        persona terbeli = personaUtama[index];
+
         if (userPtr->uang < personaUtama[index].harga) {
             throw runtime_error("Uang tidak cukup!");
         }
 
-        
-        persona terbeli = personaUtama[index];
+        mysql_query(conn, "START TRANSACTION");
 
-        
+        string insertCollection =
+            "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
+            to_string(userPtr->id) + ", " +
+            to_string(terbeli.id) + ", " +
+            to_string(terbeli.level) + ")";
+
+        if (mysql_query(conn, insertCollection.c_str())) {
+            cout << "Gagal menyimpan persona ke collection: " << mysql_error(conn) << endl;
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        int uangBaru = userPtr->uang - terbeli.harga;
+
+        string updateUang =  "UPDATE users SET uang = " + to_string(uangBaru) +
+                             " WHERE id = " + to_string(userPtr->id);
+
+        if (mysql_query(conn, updateUang.c_str())) {
+            cout << "Gagal update uang user: " << mysql_error(conn) << endl;
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        mysql_query(conn, "COMMIT");
+
         profilePtr->listPersona.push_back(terbeli);
-
-        
-        userPtr->uang -= personaUtama[index].harga;
+        userPtr->uang = uangBaru;
 
         cout << "persona berhasil dibeli! Sisa uang: " << userPtr->uang << endl;
     }
@@ -1137,11 +1240,13 @@ void beliSkill(LevelUser* userPtr, personaUser* profilePtr) {
     cout << "Sisa uang: " << userPtr->uang << endl;
 }
 
-void userMenu(int userIndex) { 
+void userMenu(MYSQL* conn, int userIndex) { 
     int profilIndex = cariAtauBuatProfil(users[userIndex].nama);
 
     LevelUser* currentUserPtr = &users[userIndex]; 
     personaUser* currentUserProfilePtr = &profilUser[profilIndex]; 
+
+    loadUserPersonaCollectionFromDB(conn, currentUserPtr, currentUserProfilePtr);
 
     int pilihan;
     do {
@@ -1160,19 +1265,30 @@ void userMenu(int userIndex) {
         pilihan = cekInteger("masukkan pilihan : ");
         switch (pilihan) {
 
-            case 1: lihatPersonaUser(currentUserProfilePtr); break; 
-            case 2: cariPersona(&(currentUserProfilePtr->listPersona), &(currentUserPtr->status)); break; 
-            case 3: beliPersona(currentUserPtr, currentUserProfilePtr); break; 
-            case 4: fusePersona(currentUserProfilePtr); break; 
-            case 5: updateSkillUser(currentUserProfilePtr); break; 
-            case 6: sortingPersona(&(currentUserProfilePtr->listPersona), &(currentUserPtr->status)); break; 
-            case 7: hapusPersonaUser(currentUserProfilePtr); break;
-            case 8: beliSkill(currentUserPtr, currentUserProfilePtr); break; 
-            case 0: cout << "Log out" << endl; break;
+            case 1: lihatPersonaUser(currentUserProfilePtr); 
+                break; 
+            case 2: cariPersona(&(currentUserProfilePtr->listPersona), &(currentUserPtr->status)); 
+                break; 
+            case 3: beliPersona(conn, currentUserPtr, currentUserProfilePtr); 
+                break; 
+            case 4: fusePersona(currentUserProfilePtr); 
+                break; 
+            case 5: updateSkillUser(currentUserProfilePtr); 
+                break; 
+            case 6: sortingPersona(&(currentUserProfilePtr->listPersona), &(currentUserPtr->status)); 
+                break; 
+            case 7: hapusPersonaUser(currentUserProfilePtr); 
+                break;
+            case 8: beliSkill(currentUserPtr, currentUserProfilePtr); 
+                break; 
+            case 0: cout << "Log out" << endl; 
+                break;
             default: cout << "pilihan tidak valid." << endl;
         }
     } while (pilihan != 0);
 }
+
+
 
 MYSQL* connectDB() {
     MYSQL* conn = mysql_init(nullptr);
@@ -1229,6 +1345,7 @@ vector<persona> loadPersonaFromDB(MYSQL* conn) {
         int personaId = stoi(row[0]);
 
         persona p;
+        p.id = stoi(row[0]);
         p.nama = row[1];
         p.level = stoi(row[2]);
         p.arcana = row[3];
@@ -1262,13 +1379,74 @@ vector<persona> loadPersonaFromDB(MYSQL* conn) {
     return daftar;
 }
 
+void loadUserPersonaCollectionFromDB(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
+    profilePtr->listPersona.clear();
+
+    string query =
+        "SELECT upc.persona_instance_id, p.id, p.nama, upc.level_saat_ini, a.nama_arcana, p.harga "
+        "FROM user_persona_collection upc "
+        "JOIN persona p ON upc.original_persona_id = p.id "
+        "JOIN arcana_master a ON p.arcana_id = a.id "
+        "WHERE upc.user_id = " + to_string(userPtr->id) + " "
+        "ORDER BY upc.persona_instance_id";
+
+    if (mysql_query(conn, query.c_str())) {
+        cout << "Gagal load persona user: " << mysql_error(conn) << endl;
+        return;
+    }
+
+    MYSQL_RES* res = mysql_store_result(conn);
+
+    if (res == nullptr) {
+        cout << "Gagal ambil data persona user: " << mysql_error(conn) << endl;
+        return;
+    }
+
+    MYSQL_ROW row;
+
+    while ((row = mysql_fetch_row(res))) {
+        int originalPersonaId = atoi(row[1]);
+
+        persona p;
+        p.id = originalPersonaId;
+        p.nama = row[2];
+        p.level = atoi(row[3]);
+        p.arcana = row[4];
+        p.harga = atoi(row[5]);
+
+        string skillQuery =
+            "SELECT sm.nama_skill "
+            "FROM persona_skills ps "
+            "JOIN skill_master sm ON ps.skill_id = sm.id "
+            "WHERE ps.persona_id = " + to_string(originalPersonaId) + " "
+            "ORDER BY sm.id";
+
+        if (mysql_query(conn, skillQuery.c_str())) {
+            cout << "Gagal load skill persona user: " << mysql_error(conn) << endl;
+        } else {
+            MYSQL_RES* skillRes = mysql_store_result(conn);
+            MYSQL_ROW skillRow;
+
+            while ((skillRow = mysql_fetch_row(skillRes))) {
+                p.skills.push_back(skillRow[0]);
+            }
+
+            mysql_free_result(skillRes);
+        }
+
+        profilePtr->listPersona.push_back(p);
+    }
+
+    mysql_free_result(res);
+}
+
 vector<LevelUser> loadUsersFromDB(MYSQL* conn) {
     vector<LevelUser> daftar;
 
     string query =
-        "SELECT nama_user, password, uang, status "
-        "FROM users "
-        "ORDER BY id";
+    "SELECT id, nama_user, password, uang, status "
+    "FROM users "
+    "ORDER BY id";
 
     if (mysql_query(conn, query.c_str())) {
         cerr << "Query users gagal: " << mysql_error(conn) << endl;
@@ -1286,11 +1464,12 @@ vector<LevelUser> loadUsersFromDB(MYSQL* conn) {
 
     while ((row = mysql_fetch_row(res))) {
         LevelUser u;
-        u.nama = row[0];
-        u.password = row[1];
-        u.uang = stoi(row[2]);
+        u.id = stoi(row[0]);
+        u.nama = row[1];
+        u.password = row[2];
+        u.uang = stoi(row[3]);
 
-        string statusDB = row[3];
+        string statusDB = row[4];
 
         if (statusDB == "admin") {
             u.status = 1;
@@ -1454,7 +1633,7 @@ int main() {
                 if (loggedUserPtr->status == 1) { 
                     menuAdmin(loggedUserPtr, conn); 
                 } else if (loggedUserPtr->status == 2) { 
-                    userMenu(currentUserIndex);
+                    userMenu(conn, currentUserIndex);
                 } else {
                     cout << "status user tidak dikenali." << endl;
                 }
@@ -1465,9 +1644,9 @@ int main() {
         } else {
             cout << "pilihan tidak valid." << endl;
         }
+        
+        panggilPersona(conn);
     }
-
-    panggilPersona(conn);
 
     mysql_close(conn);
     return 0;
