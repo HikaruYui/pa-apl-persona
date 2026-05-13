@@ -453,19 +453,6 @@ INSERT INTO `skill_master` (`id`, `nama_skill`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `temp_fusion_plan`
---
-
-CREATE TABLE `temp_fusion_plan` (
-  `session_id` varchar(255) DEFAULT NULL,
-  `result_persona_instance_id` int(11) DEFAULT NULL,
-  `inherited_from_persona_id` int(11) DEFAULT NULL,
-  `skill_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `users`
 --
 
@@ -553,12 +540,6 @@ ALTER TABLE `skill_card_shop`
 --
 ALTER TABLE `skill_master`
   ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `temp_fusion_plan`
---
-ALTER TABLE `temp_fusion_plan`
-  ADD KEY `skill_id` (`skill_id`);
 
 --
 -- Indexes for table `users`
@@ -657,12 +638,6 @@ ALTER TABLE `persona_skills`
 --
 ALTER TABLE `skill_card_shop`
   ADD CONSTRAINT `skill_card_shop_ibfk_1` FOREIGN KEY (`skill_id`) REFERENCES `skill_master` (`id`);
-
---
--- Constraints for table `temp_fusion_plan`
---
-ALTER TABLE `temp_fusion_plan`
-  ADD CONSTRAINT `temp_fusion_plan_ibfk_1` FOREIGN KEY (`skill_id`) REFERENCES `skill_master` (`id`);
 
 --
 -- Constraints for table `user_persona_collection`
