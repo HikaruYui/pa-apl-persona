@@ -652,8 +652,131 @@ ALTER TABLE `user_persona_collection`
 ALTER TABLE `user_persona_equipped_skills`
   ADD CONSTRAINT `user_persona_equipped_skills_ibfk_1` FOREIGN KEY (`persona_instance_id`) REFERENCES `user_persona_collection` (`persona_instance_id`),
   ADD CONSTRAINT `user_persona_equipped_skills_ibfk_2` FOREIGN KEY (`skill_id`) REFERENCES `skill_master` (`id`);
+  
+CREATE TABLE special_fusion_recipe (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    result_persona_id INT NOT NULL,
+    FOREIGN KEY (result_persona_id) REFERENCES persona(id)
+);
+
+CREATE TABLE special_fusion_material (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipe_id INT NOT NULL,
+    material_persona_id INT NOT NULL,
+    FOREIGN KEY (recipe_id) REFERENCES special_fusion_recipe(id),
+    FOREIGN KEY (material_persona_id) REFERENCES persona(id)
+);
+
+ALTER TABLE `persona` ADD isSpecialMaterial BOOLEAN;
+
+UPDATE `persona` SET isSpecialMaterial = FALSE;
+UPDATE `persona` SET isSpecialMaterial = TRUE WHERE nama IN('Angel', 'Silky', 'Unicorn', 'Berith', 'Forneus');
+
+INSERT INTO arcana_master (id, nama_arcana) VALUES 
+(11, 'strength'),
+(12, 'Tower'),
+(13, 'Moon'),
+(14, 'Fortune');
+
+INSERT INTO persona (nama, level, harga, isSpecial, arcana_id, isSpecialMaterial) VALUES 
+
+('Fortuna', 20, 0, 1, (SELECT id FROM arcana_master WHERE nama_arcana = 'Fortune'), 0),
+('Pale Rider', 30, 0, 1, (SELECT id FROM arcana_master WHERE nama_arcana = 'Death'), 0),
+('Flauros', 40, 0, 1, (SELECT id FROM arcana_master WHERE nama_arcana = 'Hierophant'), 0),
+('Gurulu', 18, 0, 0, (SELECT id FROM arcana_master WHERE nama_arcana = 'Moon'), 1),
+('Matador', 25, 0, 0, (SELECT id FROM arcana_master WHERE nama_arcana = 'Strength'), 1),
+('Eligor', 34,0, 0, (SELECT id FROM arcana_master WHERE nama_arcana = 'Tower'), 1);
+
+-- Tambahkan skill baru ke skill_master
+INSERT INTO `skill_master` (`nama_skill`) VALUES
+('resist fear'),
+('agilao'),
+('auto sukukaja'),
+('growth 1'),
+('torrent shot'),
+('vacuum slash'),
+('dodge pierce'),
+('swift strike'),
+('revolution'),
+('cruel attack');
+
+-- Tambahkan skill ke Fortuna
+INSERT INTO `persona_skills` (`persona_id`, `skill_id`)
+SELECT p.id, sm.id 
+FROM `persona` p
+CROSS JOIN `skill_master` sm
+WHERE p.nama = 'Fortuna' 
+AND sm.nama_skill IN ('garu', 'bufu', 'patra');
+
+-- Tambahkan skill ke Pale Rider
+INSERT INTO `persona_skills` (`persona_id`, `skill_id`)
+SELECT p.id, sm.id 
+FROM `persona` p
+CROSS JOIN `skill_master` sm
+WHERE p.nama = 'Pale Rider' 
+AND sm.nama_skill IN ('maeiha', 'fatal end', 'resist fear');
+
+-- Tambahkan skill ke Flauros
+INSERT INTO `persona_skills` (`persona_id`, `skill_id`)
+SELECT p.id, sm.id 
+FROM `persona` p
+CROSS JOIN `skill_master` sm
+WHERE p.nama = 'Flauros' 
+AND sm.nama_skill IN ('agilao', 'swift strike', 'auto sukukaja');
+
+-- Tambahkan skill ke Gurulu
+INSERT INTO `persona_skills` (`persona_id`, `skill_id`)
+SELECT p.id, sm.id 
+FROM `persona` p
+CROSS JOIN `skill_master` sm
+WHERE p.nama = 'Gurulu' 
+AND sm.nama_skill IN ('eiha', 'power slash', 'growth 1');
+
+-- Tambahkan skill ke Matador
+INSERT INTO `persona_skills` (`persona_id`, `skill_id`)
+SELECT p.id, sm.id 
+FROM `persona` p
+CROSS JOIN `skill_master` sm
+WHERE p.nama = 'Matador' 
+AND sm.nama_skill IN ('torrent shot', 'vacuum slash', 'dodge pierce');
+
+-- Tambahkan skill ke Eligor
+INSERT INTO `persona_skills` (`persona_id`, `skill_id`)
+SELECT p.id, sm.id 
+FROM `persona` p
+CROSS JOIN `skill_master` sm
+WHERE p.nama = 'Eligor' 
+AND sm.nama_skill IN ('revolution', 'torrent shot', 'cruel attack');
+
+INSERT INTO `special_fusion_recipe` (`result_persona_id`)
+SELECT id FROM `persona` WHERE nama IN ('Fortuna', 'Pale Rider', 'Flauros');
+
+-- 1. Fortuna (Angel, Silky, Unicorn)
+INSERT INTO `special_fusion_material` (`recipe_id`, `material_persona_id`)
+SELECT sfr.id, p_mat.id
+FROM `special_fusion_recipe` sfr
+JOIN `persona` p_res ON sfr.result_persona_id = p_res.id
+JOIN `persona` p_mat ON p_mat.nama IN ('Angel', 'Silky', 'Unicorn')
+WHERE p_res.nama = 'Fortuna';
+
+-- 2. Pale Rider (Berith, Gurulu, Matador, Eligor)
+INSERT INTO `special_fusion_material` (`recipe_id`, `material_persona_id`)
+SELECT sfr.id, p_mat.id
+FROM `special_fusion_recipe` sfr
+JOIN `persona` p_res ON sfr.result_persona_id = p_res.id
+JOIN `persona` p_mat ON p_mat.nama IN ('Berith', 'Gurulu', 'Matador')
+WHERE p_res.nama = 'Pale Rider';
+
+-- 3. Flauros (Forneus, Eligor, Berith)
+INSERT INTO `special_fusion_material` (`recipe_id`, `material_persona_id`)
+SELECT sfr.id, p_mat.id
+FROM `special_fusion_recipe` sfr
+JOIN `persona` p_res ON sfr.result_persona_id = p_res.id
+JOIN `persona` p_mat ON p_mat.nama IN ('Forneus', 'Eligor', 'Berith')
+WHERE p_res.nama = 'Flauros';
+
 COMMIT;
 
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHAACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
