@@ -45,12 +45,6 @@ struct personaUser {
     
 };
 
-struct FusionRule {
-    string arcana1;
-    string arcana2;
-    string hasilArcana;
-};
-
 struct skillCard {
     int id;
     string nama_skill;
@@ -62,18 +56,14 @@ string escapeSQL(MYSQL* conn, const string& input);
 void loadUserPersonaCollectionFromDB(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr);
 int cariHasilSpecialPersonaDB(MYSQL* conn, const vector<persona>& parents);
 string cariHasilArcanaDB(MYSQL* conn, string arcana1, string arcana2);
+void printPersona(persona p, bool tampilkanHarga);
+void lihatPersonaUtama();
+void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr);
 
 vector<LevelUser> users;
 vector<persona> personaUtama;
 vector<personaUser> profilUser;
-
-vector<skillCard> skillCardShop;;
-
-vector<string> skillItems;
-
-vector<int> hargaSkill;
-
-vector<FusionRule> fusionRules;
+vector<skillCard> skillCardShop;
 
 int cariPersonaFusionLevel(string hasilArcana, int targetLevel) {
     int indeksTerbaik = -1;
@@ -134,7 +124,7 @@ int cekInteger(const string& prompt){
             if (input_angka < 0){
                 cin.clear();
                 clearInputBuffer();
-                throw runtime_error("input tidak boleh kurang dari satu");
+                throw runtime_error("input tidak boleh angka negatif");
             }
             return input_angka;
         }
@@ -185,17 +175,17 @@ vector<string> skillWarisan(persona parent1, persona parent2) {
     while ((int)skillDipilih.size() < jumlahWajib) {
 
         try {
-        int pilihan = cekInteger("Silakan Pilih skill warisan (Tekan 0 jika selesai)");
+        int pilihan = cekInteger("Silakan Pilih skill warisan: ");
 
-        if (pilihan < 1 || pilihan > semuaSkill.size()) {
-            throw out_of_range("nomor skill tidak ada di daftar");
+        if (pilihan == 0) {
+            break;
         }
 
-        
+        if (pilihan < 1 || pilihan > semuaSkill.size()) {
+            throw out_of_range("Nomor skill tidak ada di daftar");
+        }
 
- 
         string skill = semuaSkill[pilihan - 1];
-
         
         if (skillSudahAda(skillDipilih, skill)) {
             throw invalid_argument("Skill Sudah Ada Pada persona!");
@@ -465,7 +455,7 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
             getline(cin, pilihanNama); 
 
             std::transform(pilihanNama.begin(), pilihanNama.end(), pilihanNama.begin(),
-                           [](unsigned char c){ return std::tolower(c); });
+                           [](unsigned char c){return std::tolower(c); });
 
             int low = 0;
             int high = daftarPersona->size() - 1;
@@ -479,21 +469,13 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
 
                 if (midNameLower == pilihanNama) {
                     cout << "data ditemuin " << endl;
-                    cout << "\n====== " << (*daftarPersona)[mid].nama << " ======" << endl;
-                    cout << "Level    : " << (*daftarPersona)[mid].level << endl;
-                    cout << "Arcana   : " << (*daftarPersona)[mid].arcana << endl;
-                    cout << "Skill    : ";
-                    for (const auto& skill : (*daftarPersona)[mid].skills) {
-                        cout << skill << ", ";
-                    }
-                    cout << endl;
-                    if (*status == 1){
-                        cout << "harga    : " << (*daftarPersona)[mid].harga << endl;
-                    }
+                    printPersona((*daftarPersona)[mid], *status == 1);
                     ketemu = true;
                     break;
+
                 } else if (midNameLower < pilihanNama) {
                     low = mid + 1;
+
                 } else {
                     high = mid - 1;
                 }
@@ -510,14 +492,7 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
             for (int i = 0; i < daftarPersona->size(); i++) {
                 if (pilihanLevel == (*daftarPersona)[i].level) {
                     cout << "data ditemuin " << endl;
-                    cout << "\n====== " << (*daftarPersona)[i].nama << " ======" << endl;
-                    cout << "Level    : " << (*daftarPersona)[i].level << endl;
-                    cout << "Arcana   : " << (*daftarPersona)[i].arcana << endl;
-                    cout << "Skill    : ";
-                    for (const auto& skill : (*daftarPersona)[i].skills) {
-                        cout << skill << ", ";
-                    }
-                    cout << endl;
+                    printPersona((*daftarPersona)[i], *status == 1);
                     levelKetemu = true;
                 }
             }
@@ -533,21 +508,38 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
     }
 }
 
+// Helper tampilkan Persona
+void printPersona(persona p, bool tampilkanHarga) {
+    cout << "======" << p.nama << "======" << endl;
+    cout << "Level   : " << p.level << endl;
+    cout << "Arcana  : " << p.arcana << endl;
+
+    cout << "Skill   : ";
+    for (int i = 0; i < p.skills.size(); i++) {
+        cout << p.skills[i];
+
+        // biar koma tidak muncul di skill terakhir.
+        if (i < p.skills.size() - 1) {
+            cout << ", ";
+        }
+    }
+    cout << endl;
+
+    if (tampilkanHarga) {
+        cout << "Harga   : " << p.harga << endl; 
+    }
+}
+
+// Helper tampilkan Persona
 void lihatPersonaUtama() {
-    if (personaUtama.empty()) {
-        cout << "Tidak ada persona yang bisa dibaca" << endl;
+     if (personaUtama.empty()) {
+        cout << "Belum ada Persona" << endl;
         return;
     }
-    for (size_t i = 0; i < personaUtama.size(); ++i) {
-        cout << "\n====== " << i + 1 << " " <<personaUtama[i].nama << " ======" << endl;
-        cout << "Level    : " << personaUtama[i].level << endl;
-        cout << "Arcana   : " << personaUtama[i].arcana << endl;
-        cout << "Skill    : ";
-        for (const auto& skill : personaUtama[i].skills) {
-            cout << skill << ", ";
-        }
-        cout << endl;
-        cout << "Harga    : " << personaUtama[i].harga << endl;
+
+    for (int i = 0; i < personaUtama.size(); i++) {
+        cout << "\nNo. " << i + 1 << endl; 
+        printPersona(personaUtama[i], true);
     }
 }
 
@@ -573,6 +565,7 @@ string escapeSQL(MYSQL* conn, const string& input) {
 
 /*Tambahkan helper ambil/buat arcana
 Kalau arcana belum ada, fungsi ini akan otomatis masukin ke arcana_master.*/
+
 int createArcana(MYSQL* conn, const string& arcanaName) {
     // Mengamankan teks arcanaName sebelum dimasukkan ke query SQL.
     string arcanaEsc = escapeSQL(conn, arcanaName);
@@ -585,6 +578,12 @@ int createArcana(MYSQL* conn, const string& arcanaName) {
     /*Menjalankan query selectQuery ke database. selectQuery itu tipe C++ string. Tapi mysql_query() butuh const char*, jadi dipakai: selectQuery.c_str()
     Kalau query gagal, mysql_query() mengembalikan nilai bukan 0, sehingga masuk ke blok if.*/
     MYSQL_RES* res = mysql_store_result(conn);
+
+    if (res == nullptr) {
+        cout << "Gagal mengambil hasil query arcana: " << mysql_error(conn) << endl;
+        return -1;
+    }
+
     /*Mengambil hasil query SELECT tadi dan menyimpannya ke variabel res. res ini berisi hasil tabel dari query.*/
     MYSQL_ROW row = mysql_fetch_row(res);
     /*Mengambil satu baris pertama dari hasil query. Kalau arcana ditemukan, row berisi data. Kalau tidak ditemukan, row bernilai NULL.*/
@@ -616,6 +615,11 @@ int getOrCreateSkill(MYSQL* conn, const string& skillName) {
         return -1;
     }
     MYSQL_RES* res = mysql_store_result(conn);
+    if (res == nullptr) {
+        cout << "Gagal mengambil hasil query skill arcana: " << endl;
+        return -1;
+    }
+
     MYSQL_ROW row = mysql_fetch_row(res);
 
     if (row) {
@@ -682,7 +686,10 @@ void tambahPersona(MYSQL* conn) {
 
     newP.harga = cekInteger("masukkan harga persona : ");
     
-    mysql_query(conn, "Start Transaction");
+    if (mysql_query(conn, "START TRANSACTION")) {
+        cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+        return;
+    }
     
     int arcanaId = createArcana(conn, newP.arcana);
     if (arcanaId == -1) {
@@ -727,7 +734,11 @@ void tambahPersona(MYSQL* conn) {
         }
     }
     
-    mysql_query(conn, "COMMIT");
+    if (mysql_query(conn, "COMMIT")) {
+        cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
     personaUtama.push_back(newP);
 
     cout << "Data persona berhasil dimasukkan ke database!" << endl;
@@ -761,8 +772,8 @@ void updatePersona(MYSQL* conn) {
         cout << "4. Ubah skill persona" << endl;
         cout << "5. Ubah harga persona" << endl;
         cout << "0. Batal update" << endl;
-        cout << "pilihan: ";
-        cin >> pilihan;
+
+        pilihan = cekInteger("Pilihan: ");
 
         switch (pilihan) {
         case 1: {
@@ -870,7 +881,10 @@ void updatePersona(MYSQL* conn) {
                 break;
             }
 
-            mysql_query(conn, "START TRANSACTION");
+            if (mysql_query(conn, "START TRANSACTION")) {
+                cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+                return;
+            }
             
             int skillBaruId = getOrCreateSkill(conn, skillBaru);
 
@@ -899,7 +913,12 @@ void updatePersona(MYSQL* conn) {
                 break;
             }
 
-            mysql_query(conn, "COMMIT");
+            if (mysql_query(conn, "COMMIT")) {
+                cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+                mysql_query(conn, "ROLLBACK");
+                return;
+            }
+
             personaUtama[idx].skills[idxSkill] = skillBaru;
 
             cout << "Skill persona berhasil diubah!" << endl;
@@ -961,7 +980,10 @@ void hapusPersona(MYSQL* conn) {
         return;
     }
 
-    mysql_query(conn, "START TRANSACTION");
+    if (mysql_query(conn, "START TRANSACTION")) {
+        cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+        return;
+    }
 
     string deleteSkill =
         "DELETE FROM persona_skills WHERE persona_id = " + to_string(personaId);
@@ -981,7 +1003,11 @@ void hapusPersona(MYSQL* conn) {
         return;
     }
 
-    mysql_query(conn, "COMMIT");
+    if (mysql_query(conn, "COMMIT")) {
+        cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
 
     personaUtama.erase(personaUtama.begin() + idx);
 
@@ -1026,16 +1052,9 @@ void lihatPersonaUser(personaUser* profilePtr) {
         cout << "Tidak ada persona yang dilihat" << endl;
         return;
     }
-    for (size_t i = 0; i < (*profilePtr).listPersona.size(); ++i) { 
-        const auto& p = (*profilePtr).listPersona[i]; 
-        cout << "\n====== "<< i + 1 << p.nama << " ======" << endl;
-        cout << "Level    : " << p.level << endl;
-        cout << "Arcana   : " << p.arcana << endl;
-        cout << "Skill    : ";
-        for (const auto& skill : p.skills) {
-            cout << skill << ", ";
-        }
-        cout << endl;
+    for (int i = 0; i < (*profilePtr).listPersona.size(); ++i) { 
+        cout << "\nNo. " << i + 1 << endl;
+        printPersona(profilePtr->listPersona[i], false);
     }
 }
 
@@ -1068,7 +1087,10 @@ void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
             throw runtime_error("Uang tidak cukup!");
         }
 
-        mysql_query(conn, "START TRANSACTION");
+        if (mysql_query(conn, "START TRANSACTION")) {
+            cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+            return;
+        }
 
         string insertCollection =
             "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
@@ -1116,7 +1138,11 @@ void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
             return;
         }
 
-        mysql_query(conn, "COMMIT");
+        if (mysql_query(conn, "COMMIT")) {
+            cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
 
         profilePtr->listPersona.push_back(terbeli);
         userPtr->uang = uangBaru;
@@ -1260,7 +1286,10 @@ void fusePersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
         }
 
 
-        mysql_query(conn, "START TRANSACTION");
+        if (mysql_query(conn, "START TRANSACTION")) {
+            cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+            return;
+        }
 
         string insertCollection =
             "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
@@ -1316,7 +1345,11 @@ void fusePersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
             return;
         }
 
-        mysql_query(conn, "COMMIT");
+        if (mysql_query(conn, "COMMIT")) {
+            cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
 
         profilePtr->listPersona.push_back(hasilFusion);
 
@@ -1347,86 +1380,125 @@ void updateSkillUser(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
 
     if (index >= 0 && index < (int)(*profilePtr).listPersona.size()) { 
         auto& p = (*profilePtr).listPersona[index]; 
+
         if (p.skills.empty()) {
             cout << "persona ini tidak memiliki skill" << endl;
             return;
         }
+
         for (size_t j = 0; j < p.skills.size(); ++j) {
             cout << (j + 1) << ". " << p.skills[j] << endl;
         }
+
         int idxSkill = cekInteger("pilih nomor skill yang ingin diubah : ");
         idxSkill -= 1;
+
         if (idxSkill >= 0 && idxSkill < (int)p.skills.size()) {
+
+            if (userPtr->inventorySkill.empty()) {
+                cout << "Kamu belum punya skill card" << endl;
+                return;
+            }
             cout << "Daftar Skill card:" << endl;
+
             for (size_t i = 0; i < userPtr->inventorySkill.size(); ++i) {
                 list_skill_card = userPtr->inventorySkill[i];
                 cout << (i + 1) << ". " << list_skill_card.nama_skill << endl;
                 cout << "jumlah : " << list_skill_card.jumlah << endl;
             }
+
             int idxItem = cekInteger("pilih nomor skill card");
             idxItem -= 1;
+
            if (idxItem >= 0 && idxItem < (int)userPtr->inventorySkill.size()) {
                 list_skill_card = userPtr->inventorySkill[idxItem];
+
                 if (cekSkillPersona(p.skills, list_skill_card.nama_skill, idxSkill)) {
                     cout << "Sudah punya skill yang sama, batalkan pembaruan" << endl;
+
                 } else {
                     persona editedPersona = (*profilePtr).listPersona[index];
 
-                    if (list_skill_card.jumlah == 1){
-
-                        string query = "DELETE FROM inventori_user "
-                        "WHERE user_id = "+ to_string(userPtr->id) +" "
-                        "AND skill_tersimpan = "+ to_string(list_skill_card.id) +"";
-
-                        if (mysql_query(conn, query.c_str())){
-                        cerr << "Query update invetory user gagal: " << mysql_error(conn) << endl;
+                    if (mysql_query(conn, "START TRANSACTION")) {
+                        cout << "Gagal memulai transaksi" << mysql_error(conn) << endl;
                         return;
-                        }
-
-                        string queryUpdate = "UPDATE user_persona_equipped_skills SET skill_id = "+ to_string(list_skill_card.id) +" " 
-                        "WHERE persona_instance_id = "+ to_string(editedPersona.id) +" "
-                        "AND skill_id = (SELECT id FROM skill_master WHERE nama_skill = '"+ editedPersona.skills[idxSkill] +"')";
-
-                        if (mysql_query(conn, queryUpdate.c_str())){
-                        cerr << "Query update skill persona user gagal: " << mysql_error(conn) << endl;
-                        return;
-                        }
-
-                        p.skills[idxSkill] = list_skill_card.nama_skill;
-                        userPtr->inventorySkill.erase(userPtr->inventorySkill.begin() + idxItem);
-                        cout << "Pembaruan berhasil" << endl;
-                    }else {
-                        string queryUpdate = "UPDATE inventori_user SET "
-                        "jumlah_skill_card = "+ to_string(userPtr->inventorySkill[idxItem].jumlah - 1) +" "
-                        "WHERE user_id = "+ to_string(userPtr->id) +" AND skill_tersimpan = "+ to_string(userPtr->inventorySkill[idxItem].id) +"";
-
-                        if (mysql_query(conn, queryUpdate.c_str())){
-                        cerr << "Query update inventory gagal: " << mysql_error(conn) << endl;
-                        return;
-                        }
-
-                        string queryUpdate2 = 
-                            "UPDATE user_persona_equipped_skills SET skill_id = "+ to_string(list_skill_card.id) +" " 
-                            "WHERE persona_instance_id = "+ to_string(editedPersona.id) +" "
-                            "AND skill_id = (SELECT id FROM skill_master WHERE nama_skill = '"+ editedPersona.skills[idxSkill] +"')";
-
-                        if (mysql_query(conn, queryUpdate2.c_str())){
-                        cerr << "Query update skill persona user gagal: " << mysql_error(conn) << endl;
-                        return;
-                        }
-
-                        p.skills[idxSkill] = list_skill_card.nama_skill;
-                        userPtr->inventorySkill[idxItem].jumlah -= 1;
-                        cout << "Pembaruan berhasil" << endl;
                     }
-                }
-            } else {
+
+                    bool hapusInventory = false;
+
+                    if (list_skill_card.jumlah == 1) {
+
+                        string queryDeleteInventory = 
+                            "DELETE FROM inventori_user "
+                            "WHERE user_id = " + to_string(userPtr->id) + " "
+                            "AND skill_tersimpan = " + to_string(list_skill_card.id);
+
+                        if (mysql_query(conn, queryDeleteInventory.c_str())){
+                            cerr << "Query update inventory user gagal: " << mysql_error(conn) << endl;
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+                        
+                        hapusInventory = true;
+                        } 
+                        else {
+                            string queryUpdateInventory = 
+                                "UPDATE inventori_user SET "
+                                "jumlah_skill_card = " + to_string(userPtr->inventorySkill[idxItem].jumlah - 1) + " "
+                                "WHERE user_id = " + to_string(userPtr->id) + " "
+                                "AND skill_tersimpan = " + to_string(userPtr->inventorySkill[idxItem].id);
+
+                            if (mysql_query(conn, queryUpdateInventory.c_str())){
+                                cerr << "Query update inventory gagal: " << mysql_error(conn) << endl;
+                                mysql_query(conn, "ROLLBACK");
+                                return;
+                            }
+                        }
+
+                        string skillLamaEsc = escapeSQL(conn, editedPersona.skills[idxSkill]);
+
+                        string queryUpdateSkill = 
+                            "UPDATE user_persona_equipped_skills SET skill_id = " + to_string(list_skill_card.id) + " "
+                            "WHERE persona_instance_id = " + to_string(editedPersona.id) + " "
+                            "AND skill_id = (SELECT id FROM skill_master WHERE nama_skill = '" + skillLamaEsc + "')";
+
+                        if (mysql_query(conn, queryUpdateSkill.c_str())){
+                            cerr << "Query update skill persona user gagal: " << mysql_error(conn) << endl;
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        if (mysql_affected_rows(conn) == 0) {
+                            cout << "Skill lama tidak ditemukan di database." << endl;
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        if (mysql_query(conn, "COMMIT")) {
+                            cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        p.skills[idxSkill] = list_skill_card.nama_skill;
+                        if (hapusInventory) {
+                            userPtr->inventorySkill.erase(userPtr->inventorySkill.begin() + idxItem); 
+                        }
+                        else {
+                            userPtr->inventorySkill[idxItem].jumlah -= 1;
+                        }
+                        cout << "Pembaruan berhasil" << endl; 
+                }             
+            } 
+            else {
                 cout << "Nomor skill item tidak ada" << endl;
             }
-        } else {
+        } 
+        else {
             cout << "Nomor skill persona tidak ada" << endl;
         }
-    } else {
+    } 
+    else {
         cout << "Nomor persona tidak ada" << endl;
     }
 }
@@ -1449,7 +1521,10 @@ void hapusPersonaUser(MYSQL* conn, personaUser* profilePtr) {
     int idx = index - 1;
     persona deletedPersona = profilePtr->listPersona[idx];
 
-    mysql_query(conn, "START TRANSACTION");
+    if (mysql_query(conn, "START TRANSACTION")) {
+        cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+        return;
+    }
 
     string queryHapusSkillUser =
         "DELETE FROM user_persona_equipped_skills WHERE persona_instance_id = " +
@@ -1471,7 +1546,11 @@ void hapusPersonaUser(MYSQL* conn, personaUser* profilePtr) {
         return;
     }
 
-    mysql_query(conn, "COMMIT");
+    if (mysql_query(conn, "COMMIT")) {
+        cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
 
     profilePtr->listPersona.erase(profilePtr->listPersona.begin() + idx);
 
@@ -1479,11 +1558,16 @@ void hapusPersonaUser(MYSQL* conn, personaUser* profilePtr) {
 }
 
 void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
-    cout << "\n=== Daftar Skill Item ===" << endl;
+    if (skillCardShop.empty()) {
+        cout << "Belum ada skill yang dijual" << endl;
+        return;
+    }
 
-    for (int i = 0; i < skillCardShop.size(); i++) {
+    cout << "\n=== Daftar Skill Item ===" << endl;
+    
+    for (int i = 0; i < (int)skillCardShop.size(); i++) {
         skillCard skillForSale = skillCardShop[i];
-        cout << i + 1 << ". " <<  skillForSale.nama_skill
+        cout << i + 1 << ". " << skillForSale.nama_skill 
              << " | Harga: " << skillForSale.harga << endl;
     }
 
@@ -1496,19 +1580,22 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
 
     pilih--;
 
-    if (pilih < 0 || pilih >= skillCardShop.size()) {
+    if (pilih < 0 || pilih >= (int)skillCardShop.size()) {
         cout << "Pilihan tidak valid" << endl;
         return;
     }
 
     skillCard skillTerbeli = skillCardShop[pilih];
-    
+
     if (userPtr->uang < skillTerbeli.harga) {
-        cout << "Uang tidak cukup!" << endl;
+        cout << "Uang anda tidak cukup!" << endl;
         return;
     }
 
-    mysql_query(conn, "START TRANSACTION");
+    if (mysql_query(conn, "START TRANSACTION")) {
+        cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+        return;
+    }
 
     bool sudahAda = false;
     int indexInventory = -1;
@@ -1521,37 +1608,34 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
         }
     }
 
+    skill_card_user skillBaru;
+
     if (sudahAda) {
-        string queryUpdate = 
+        string queryUpdate =
             "UPDATE inventori_user SET jumlah_skill_card = jumlah_skill_card + 1 "
             "WHERE user_id = " + to_string(userPtr->id) + " "
             "AND skill_tersimpan = " + to_string(skillTerbeli.original_id);
 
-        if (mysql_query(conn, queryUpdate.c_str())){
+        if (mysql_query(conn, queryUpdate.c_str())) {
             cerr << "Query update inventory gagal: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
-        
-        userPtr->inventorySkill[indexInventory].jumlah += 1;
-    }
-    else {
-        string queryInsert = 
+    } else {
+        string queryInsert =
             "INSERT INTO inventori_user (user_id, skill_tersimpan, jumlah_skill_card) VALUES (" +
             to_string(userPtr->id) + ", " +
             to_string(skillTerbeli.original_id) + ", 1)";
+
         if (mysql_query(conn, queryInsert.c_str())) {
-            cerr <<  "Query insert inventory gagal: " << mysql_error(conn) << endl;
+            cerr << "Query insert inventori gagal: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
-
-        skill_card_user skillBaru;
+        
         skillBaru.id = skillTerbeli.original_id;
         skillBaru.nama_skill = skillTerbeli.nama_skill;
         skillBaru.jumlah = 1;
-
-        userPtr->inventorySkill.push_back(skillBaru);
     }
 
     int uangBaru = userPtr->uang - skillTerbeli.harga;
@@ -1559,22 +1643,30 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     string updateUang =
         "UPDATE users SET uang = " + to_string(uangBaru) +
         " WHERE id = " + to_string(userPtr->id);
-    
+
     if (mysql_query(conn, updateUang.c_str())) {
         cout << "Query update uang gagal: " << mysql_error(conn) << endl;
         mysql_query(conn, "ROLLBACK");
         return;
     }
 
-    mysql_query(conn, "COMMIT");
+    if (mysql_query(conn, "COMMIT")) {
+        cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (sudahAda) {
+        userPtr->inventorySkill[indexInventory].jumlah += 1;
+    } else {
+        userPtr->inventorySkill.push_back(skillBaru);
+    }
 
     userPtr->uang = uangBaru;
 
     cout << "Skill berhasil dibeli!" << endl;
-    cout << "Sisa uang: " << userPtr->uang << endl;
+    cout << "Sisa uang: " << uangBaru << endl;
 }
-
-
 
 void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) { //------------------------------------------------+
 
@@ -1695,7 +1787,10 @@ void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr
         return;
     }
 
-    mysql_query(conn, "START TRANSACTION");
+    if (mysql_query(conn, "START TRANSACTION")) {
+        cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
+        return;
+    }
 
     string insertCollection =
          "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
@@ -1761,7 +1856,11 @@ void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr
         return;
     }
 
-    mysql_query(conn, "COMMIT");
+    if (mysql_query(conn, "COMMIT")) {
+        cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
 
     profilePtr->listPersona.push_back(hasilFusion);
     sort(pilihanIndex.begin(), pilihanIndex.end(), greater<int>());
@@ -2142,6 +2241,7 @@ void loadSkillShopFromDB(MYSQL* conn) {
     mysql_free_result(res);
 }
 
+
 bool panggilPersona(MYSQL* conn) {
     const char* query = "SELECT p.id, p.nama, p.level, a.nama_arcana, p.harga, sm.nama_skill "
                         "FROM persona AS p "
@@ -2200,9 +2300,9 @@ int main() {
     cout << "Jumlah user: " << users.size() << endl;
     cout << "Jumlah persona: " << personaUtama.size() << endl;
     cout << "Jumlah skill: " << skillCardShop.size() << endl;
-    cout << "Jumlah fusion rule: " << fusionRules.size() << endl;
 
     int currentUserIndex = -1;
+
     while (true) {
         cout << "\n=== SELAMAT DATANG DI VELVET ROOM ===" << endl;
         cout << "1. login" << endl;
@@ -2230,10 +2330,7 @@ int main() {
         } else {
             cout << "pilihan tidak valid." << endl;
         }
-        
-        panggilPersona(conn);
     }
-
     mysql_close(conn);
     return 0;
 }
