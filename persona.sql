@@ -175,7 +175,8 @@ INSERT INTO `arcana_master` (`id`, `nama_arcana`) VALUES
 CREATE TABLE `inventori_user` (
   `id` int(11) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
-  `skill_tersimpan` int(11) DEFAULT NULL
+  `skill_tersimpan` int(11) DEFAULT NULL,
+  `jumlah_skill_card` int(11) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -561,7 +562,6 @@ ALTER TABLE `user_persona_collection`
 --
 
 ALTER TABLE user_persona_equipped_skills
-DROP PRIMARY KEY,
 ADD PRIMARY KEY (persona_instance_id, skill_id);
 
 --
@@ -778,6 +778,6 @@ WHERE p_res.nama = 'Flauros';
 
 COMMIT;
 
-/*!40101 SET CHAACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
