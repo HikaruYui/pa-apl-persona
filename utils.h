@@ -54,6 +54,38 @@ string cekString(const string& prompt) {
         }
     }
 
+string cekString(const string& prompt, bool hanyaHuruf) {
+    string input;
+
+    while (true) {
+        try{
+            cout << prompt;
+            getline(cin, input);
+
+            if (input.empty() || hanyaSpasi(input)) {
+                throw invalid_argument("Input tidak boleh kosong");
+            }
+
+            for (int i = 0; i < input.length(); i++) {
+                if (hanyaHuruf) {
+                    if (!isalpha(unsigned char)input[i]) && !isspace((unsigned char)input[i]) {
+                        throw invalid_argument("Input hanya boleh huruf dan spasi");
+                    }
+                    else {
+                        if (!isalnum((unsigned char)input[i]) && !isspace((unsigned char)input[i])) {
+                            throw invalid_argument("Input tidak boleh mengandung simbol");
+                        }
+                    }
+                }
+                return input;
+            }
+            catch (const invalid_argument& e) {
+                cout << "error: " << e.what() << endl;
+            }
+        }
+    }
+}
+
 bool konfirmasiString(const string& prompt) {
     while (true) {
         string jawaban = cekString(prompt);

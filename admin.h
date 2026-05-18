@@ -280,10 +280,10 @@ void tambahPersona(MYSQL* conn) {
         return;
     }
     newP.level = cekInteger("masukkan level persona : ");
-    newP.arcana = cekStringTanpaAngka("Silakan masukkan arcana persona: ");
+    newP.arcana = cekStringTanpaAngka("Silakan masukkan arcana persona: ", true);
 
     while (newP.skills.size() < 4) {
-        string inputSkill = cekStringTanpaAngka("Skill " + to_string(newP.skills.size() + 1) + ": ");
+        string inputSkill = cekStringTanpaAngka("Skill " + to_string(newP.skills.size() + 1) + ": ", true);
 
         if (inputSkill == "stop") {
             if (newP.skills.size() >= 2) {
