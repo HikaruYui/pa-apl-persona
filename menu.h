@@ -16,6 +16,7 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr);
 void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr);
 
 void menuAdmin(LevelUser* userPtr, MYSQL* conn) {
+    int status = 1;
     int pilihan;
     do {
         cout << "\n= Menu Velvet Room Admin =" << endl;
@@ -38,7 +39,8 @@ void menuAdmin(LevelUser* userPtr, MYSQL* conn) {
                 break;
             case 5: hapusPersona(conn); 
                 break;
-            case 6: sortingPersona(&personaUtama, &(userPtr->status)); 
+            case 6: sortingPersona(&personaUtama, &status);
+                lihatPersonaUtama();
                 break;
             case 0:
                 cout << "Logout " << (*userPtr).nama << endl; 
@@ -70,7 +72,7 @@ void userMenu(MYSQL* conn, int userIndex) {
         cout << "8. Beli skill item" << endl;
         cout << "9. Special Fusion" << endl;
         cout << "0. Keluar" << endl;
-        pilihan = cekInteger("masukkan pilihan : ");
+        pilihan = cekInteger("Masukkan pilihan: ");
         switch (pilihan) {
 
             case 1: lihatPersonaUser(currentUserProfilePtr); 

@@ -130,6 +130,40 @@ bool hanyaSpasi(const string& teks) {
     return true;
 }
 
+bool hanyaHurufDanSpasi(const string& input) {
+    for (int i = 0; i < (int)input.length(); i++) {
+        if (!isalpha((unsigned char)input[i]) && !isspace((unsigned char)input[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+string cekStringTanpaAngka(const string& prompt) {
+    string input;
+
+    while (true) {
+        try {
+            cout << prompt;
+            getline(cin, input);
+
+            if (input.empty() || hanyaSpasi(input)) {
+                throw invalid_argument("Input tidak boleh kosong");
+            }
+
+            if (!hanyaHurufDanSpasi(input)) {
+                throw invalid_argument("Arcana hanya boleh huruf dan spasi");
+            }
+            return input;
+        }
+        catch (const invalid_argument& e) {
+            cout << "error: " << e.what() << endl;
+        }
+    }
+}
+
+
+
 bool cekNamaPersona(const string& name, int excludeIndex = -1) {
     for (size_t i = 0; i < personaUtama.size(); ++i) {
         if (i == excludeIndex) continue;

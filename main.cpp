@@ -32,7 +32,7 @@ int main() {
         int pilihanUtama = cekInteger("pilihan : ");
 
         if (pilihanUtama == 0) {
-            cout << "keluar dari program...." << endl;
+            cout << "Terima Kasih Telah Bermain Game Ini" << endl;
             break;
         } 
         else if (pilihanUtama == 1) {

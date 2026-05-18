@@ -7,10 +7,9 @@
 
 void registerUser(MYSQL* conn) {
     cout << "\n=== Registrasi user baru ===" << endl;
-    cout << "masukkan nama user : ";
     
-    string namaBaru = cekString("SIlakan masukkan nama anda");
-    string passBaru = cekString("SIlakan masukkan password anda");
+    string namaBaru = cekString("Silakan masukkan nama anda: ");
+    string passBaru = cekString("Silakan masukkan password anda: ");
 
     if (cekUser(namaBaru)) {
         cout << "nama user sudah terdaftar!" << endl;
