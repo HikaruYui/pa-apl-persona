@@ -116,9 +116,8 @@ bool spasi(const string& teks) {
     return true;
 }
 
-string input;
-
 int cekInteger(const string& prompt){
+    string input;
 
     while (true)
     {
@@ -160,7 +159,8 @@ int cekInteger(const string& prompt){
 }
 
 string cekString(const string& prompt) {
-
+    string input;
+    
     while(true) {
         try {
             cout << prompt;
