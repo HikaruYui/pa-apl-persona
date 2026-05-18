@@ -107,40 +107,76 @@ bool konfirmasiFuse() {
     return false;
 }
 
+bool spasi(const string& teks) {
+    for (int i = 0; i < teks.length(); i++) {
+        if (!isspace(teks[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+string input;
+
 int cekInteger(const string& prompt){
-    int input_angka;
+
     while (true)
     {
         try
         {
             cout << prompt;
-            cin >> input_angka;
+            getline(cin, input);
 
-            if (cin.fail()){
-                cin.clear();
-                clearInputBuffer();
-                throw invalid_argument("input harus angka");
+            if (input.empty() || spasi(input)) {
+                throw invalid_argument("Input tidak boleh kosong!");
             }
-            if (input_angka < 0){
-                cin.clear();
-                clearInputBuffer();
-                throw runtime_error("input tidak boleh angka negatif");
+
+            for (int i = 0; i < input.length(); i++) {
+                if (!isdigit(input[i])) {
+                    throw invalid_argument("Input harus angka");
+                }
             }
+
+            int input_angka = stoi(input);
+
+            if (input_angka < 0) {
+                throw runtime_error("Input tidak boleh angka negatif!");
+            }
+
             return input_angka;
         }
+        catch (const invalid_argument& e) {
+           cout << "error : " << e.what() << endl;
+        }
+        
+        catch (const runtime_error& e) {
+           cout << "error : " << e.what() << endl;
+        }
 
-        catch (const invalid_argument& e)
-        {
-           cout << "error : " << e.what() << endl;
+        catch (const out_of_range& e) {
+            cout << "error : Angka terlalu besar" << e.what() << endl;
         }
-        
-        catch (const runtime_error& e)
-        {
-           cout << "error : " << e.what() << endl;
-        }
-        
     }
 }
+
+string cekString(const string& prompt) {
+
+    while(true) {
+        try {
+            cout << prompt;
+            getline(cin, input);
+
+            if (input.empty() || spasi(input)) {
+                throw invalid_argument("Error: Input tidak boleh kosong");
+            } 
+            return input;
+            }
+            catch (const invalid_argument& e) {
+                cout << "Error: " << e.what() << endl;
+            }
+        }
+    }
+
 
 vector<string> skillWarisan(persona parent1, persona parent2) {
     vector<string> semuaSkill;
@@ -258,19 +294,16 @@ int cariAtauBuatProfil(const string& username) {
 }
 
 void registerUser(MYSQL* conn) {
-    string namaBaru, passBaru;
-
     cout << "\n=== Registrasi user baru ===" << endl;
     cout << "masukkan nama user : ";
-    cin >> namaBaru;
     
+    string namaBaru = cekString("SIlakan masukkan nama anda");
+    string passBaru = cekString("SIlakan masukkan password anda");
+
     if (cekUser(namaBaru)) {
         cout << "nama user sudah terdaftar!" << endl;
         return;
     }
-
-    cout << "masukkan password : ";
-    cin >> passBaru;
 
     string namaEsc = escapeSQL(conn, namaBaru);
     string passEsc = escapeSQL(conn, passBaru);
@@ -301,20 +334,17 @@ void registerUser(MYSQL* conn) {
 }
 
 bool login(int& userIndex) {
-    string inputNama, inputPass;
     int percobaan = 1;
     
     while (percobaan <= 3) {
         cout << "\n--- Menu Login ---" << endl;
-        cout << "masukkan nama (atau 0 untuk keluar): ";
-        cin >> inputNama;
+        string inputNama = cekString("Masukkan nama (atau 0 untuk keluar): ");
 
         if (inputNama == "0") {
             return false;
         }
 
-        cout << "masukkan Password : ";
-        cin >> inputPass;
+        string inputPass = cekString("Masukkan password: ");
 
         userIndex = cariIndexUser(inputNama);
 
@@ -448,11 +478,9 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
 
     switch (pilihan) {
         case 1: { 
-            string pilihanNama; 
+            
             bubbleSortNama(daftarPersona, true);
-            cout << "masukkan nama persona : ";
-            clearInputBuffer(); 
-            getline(cin, pilihanNama); 
+            string pilihanNama = cekString("Masukkan nama persona: ");
 
             std::transform(pilihanNama.begin(), pilihanNama.end(), pilihanNama.begin(),
                            [](unsigned char c){return std::tolower(c); });
@@ -643,28 +671,21 @@ int getOrCreateSkill(MYSQL* conn, const string& skillName) {
 }
 
 void tambahPersona(MYSQL* conn) {
-
     persona newP;
-    cout << "masukkan nama persona : ";
-    clearInputBuffer();
-    getline(cin, newP.nama);
+
+    newP.nama = cekString("Masukkan nama persona: ");
 
     if (cekNamaPersona(newP.nama)) {
         cout << "Gagal: Nama persona sudah ada!" << endl;
         return;
     }
-
     newP.level = cekInteger("masukkan level persona : ");
-
-    cout << "Silakan masukkan arcana persona: " << endl;
-    cin >> newP.arcana;
+    newP.arcana = cekString("Silakan masukkan arcana persona: ");
 
     clearInputBuffer();
 
     while (newP.skills.size() < 4) {
-        string inputSkill;
-        cout << "Skill " << (newP.skills.size() + 1) << ": ";
-        getline(cin, inputSkill);
+        string inputSkill = cekString("Skill " + to_string(newP.skills.size() + 1) + ": ");
 
         if (inputSkill == "stop") {
             if (newP.skills.size() >= 2) {
@@ -777,10 +798,7 @@ void updatePersona(MYSQL* conn) {
 
         switch (pilihan) {
         case 1: {
-            string namaBaru;
-            cout << "Silakan masukkan nama baru : ";
-            clearInputBuffer();
-            getline(cin, namaBaru);
+            string namaBaru = cekString("Silakan masukkan nama baru: ");
 
             if (cekNamaPersona(namaBaru, idx)) {
                 cout << "Gagal: Nama persona sudah ada!" << endl;
@@ -821,10 +839,7 @@ void updatePersona(MYSQL* conn) {
         }
 
         case 3: {
-            string arcanaBaru;
-            cout << "Silakan masukkan arcana baru : ";
-            cin >> arcanaBaru;
-
+            string arcanaBaru = cekString("Silakan masukkan arcana baru: ");
             int arcanaId = createArcana(conn, arcanaBaru);
 
             if (arcanaId == -1) {
@@ -866,15 +881,7 @@ void updatePersona(MYSQL* conn) {
 
             int idxSkill = nomorSkill - 1;
 
-            string skillBaru; 
-            cout << "Silakan Masukkan Nama Skill Baru: " << endl;
-            clearInputBuffer();
-            getline(cin, skillBaru);
-
-            if (skillBaru.empty()) {
-                cout << "Nama skill tidak boleh kosong!" << endl;
-                break;
-            }
+            string skillBaru = cekString("Silakan masukkan nama skill baru: ");
 
             if (cekSkillPersona(personaUtama[idx].skills, skillBaru, idxSkill)) {
                 cout << "Gagal: Persona ini sudah punya skill tersebut!" << endl;
@@ -1668,7 +1675,7 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     cout << "Sisa uang: " << uangBaru << endl;
 }
 
-void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) { //------------------------------------------------+
+void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) { 
 
     int jumlahParent = cekInteger("Mau Special Fusion berapa persona? (3 atau 4): ");
 
@@ -1946,7 +1953,6 @@ void userMenu(MYSQL* conn, int userIndex) {
         cout << "8. Beli skill item" << endl;
         cout << "9. Special Fusion" << endl;
         cout << "0. Keluar" << endl;
-        cout << "pilihan : ";
         pilihan = cekInteger("masukkan pilihan : ");
         switch (pilihan) {
 
