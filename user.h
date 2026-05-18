@@ -118,6 +118,11 @@ void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
         persona terbeli = personaUtama[index];
         terbeli.original_id = personaUtama[index].original_id;
 
+        if (terbeli.harga == 0) {
+            cout << "Persona special tidak bisa dibeli!" << endl;
+            return;
+        }
+
         if (userPtr->uang < personaUtama[index].harga) {
             throw runtime_error("Uang tidak cukup!");
         }
@@ -206,8 +211,8 @@ void fusePersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     lihatPersonaUser(profilePtr); 
 
     
-    int p1 = cekInteger("masukkan persona pertama");
-    int p2 = cekInteger("masukkan persona kedua");
+    int p1 = cekInteger("masukkan persona pertama: ");
+    int p2 = cekInteger("masukkan persona kedua: ");
     
     p1--;
     p2--;
@@ -429,7 +434,7 @@ void updateSkillUser(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
 
             cout << skillCardTable << endl;
 
-            int idxItem = cekInteger("pilih nomor skill card");
+            int idxItem = cekInteger("pilih nomor skill card: ");
             idxItem -= 1;
 
            if (idxItem >= 0 && idxItem < (int)userPtr->inventorySkill.size()) {

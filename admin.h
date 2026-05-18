@@ -120,7 +120,7 @@ void sortingPersona(vector<persona>* daftarPersona, int* status) {
 }
 
 void cariPersona(vector<persona>* daftarPersona, int* status) { 
-    cout << "\npilih jenis pencarian : " << endl;
+    cout << "Pilih jenis pencarian : " << endl;
     cout << "1. berdasarkan nama" << endl;
     cout << "2. berdasarkan level" << endl;
     int pilihan = cekInteger("pilihan : ");
@@ -280,12 +280,10 @@ void tambahPersona(MYSQL* conn) {
         return;
     }
     newP.level = cekInteger("masukkan level persona : ");
-    newP.arcana = cekString("Silakan masukkan arcana persona: ");
-
-    clearInputBuffer();
+    newP.arcana = cekStringTanpaAngka("Silakan masukkan arcana persona: ");
 
     while (newP.skills.size() < 4) {
-        string inputSkill = cekString("Skill " + to_string(newP.skills.size() + 1) + ": ");
+        string inputSkill = cekStringTanpaAngka("Skill " + to_string(newP.skills.size() + 1) + ": ");
 
         if (inputSkill == "stop") {
             if (newP.skills.size() >= 2) {
@@ -436,7 +434,7 @@ void updatePersona(MYSQL* conn) {
         }
 
         case 3: {
-            string arcanaBaru = cekString("Silakan masukkan arcana baru: ");
+            string arcanaBaru = cekStringTanpaAngka("Silakan masukkan arcana baru: ");
             int arcanaId = createArcana(conn, arcanaBaru);
 
             if (arcanaId == -1) {
@@ -478,7 +476,7 @@ void updatePersona(MYSQL* conn) {
 
             int idxSkill = nomorSkill - 1;
 
-            string skillBaru = cekString("Silakan masukkan nama skill baru: ");
+            string skillBaru = cekStringTanpaAngka("Silakan masukkan nama skill baru: ");
 
             if (cekSkillPersona(personaUtama[idx].skills, skillBaru, idxSkill)) {
                 cout << "Gagal: Persona ini sudah punya skill tersebut!" << endl;
@@ -574,13 +572,8 @@ void hapusPersona(MYSQL* conn) {
     int idx = index - 1;
     int personaId = personaUtama[idx].id;
 
-    char konfirmasi;
-    cout << "Apakah kamu yakin ingin menghapus persona " 
-         << personaUtama[idx].nama << "? y/n: ";
-    cin >> konfirmasi;
-
-    if (konfirmasi != 'y' && konfirmasi != 'Y') {
-        cout << "Hapus persona dibatalkan" << endl;
+    if (!konfirmasiString("Apakah kamu yakin ingin menghapus persona " + personaUtama[idx].nama + "? y/n: ")) {
+        cout << "Penghapusan dibatalkan." << endl;
         return;
     }
 
