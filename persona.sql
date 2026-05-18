@@ -776,6 +776,8 @@ JOIN `persona` p_res ON sfr.result_persona_id = p_res.id
 JOIN `persona` p_mat ON p_mat.nama IN ('Forneus', 'Eligor', 'Berith')
 WHERE p_res.nama = 'Flauros';
 
+UPDATE persona SET harga = level * 100 WHERE harga = 0 AND isSpecial = 0;
+
 COMMIT;
 
 /*!40101 SET CHAACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
