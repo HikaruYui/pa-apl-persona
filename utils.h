@@ -28,6 +28,48 @@ bool konfirmasiFuse() {
     return false;
 }
 
+string cekString(const string& prompt) {
+    string input;
+    
+    while(true) {
+        try {
+            cout << prompt;
+            getline(cin, input);
+
+            if (input.empty()) {
+                throw invalid_argument("Error: Input tidak boleh kosong");
+            } 
+
+            for (int i = 0; i < (int)input.length(); i++) {
+                if (!isalnum((unsigned char)input[i]) && !isspace((unsigned char) input[i])) {
+                    throw invalid_argument("Input tidak boleh mengandung simbol");
+                }
+            }
+
+            return input;
+            }
+            catch (const invalid_argument& e) {
+                cout << "Error: " << e.what() << endl;
+            }
+        }
+    }
+
+bool konfirmasiString(const string& prompt) {
+    while (true) {
+        string jawaban = cekString(prompt);
+
+        if (jawaban == "y" || jawaban == "Y") {
+            return true;
+        }
+
+        if (jawaban == "n" || jawaban == "N") {
+            return false;
+        }
+
+        cout << "Error: Pilihan hanya boleh y atau n" << endl;
+    }
+}
+
 bool spasi(const string& teks) {
     for (int i = 0; i < teks.length(); i++) {
         if (!isspace(teks[i])) {
@@ -79,24 +121,14 @@ int cekInteger(const string& prompt){
     }
 }
 
-string cekString(const string& prompt) {
-    string input;
-    
-    while(true) {
-        try {
-            cout << prompt;
-            getline(cin, input);
-
-            if (input.empty() || spasi(input)) {
-                throw invalid_argument("Error: Input tidak boleh kosong");
-            } 
-            return input;
-            }
-            catch (const invalid_argument& e) {
-                cout << "Error: " << e.what() << endl;
-            }
+bool hanyaSpasi(const string& teks) {
+    for (int i = 0; i < (int)teks.length(); i++) {
+        if (!isspace((unsigned char)teks[i])) {
+            return false;
         }
     }
+    return true;
+}
 
 bool cekNamaPersona(const string& name, int excludeIndex = -1) {
     for (size_t i = 0; i < personaUtama.size(); ++i) {

@@ -274,9 +274,7 @@ void fusePersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
 
         cout << "====================================" << endl;
 
-        
-
-        if (!konfirmasiFuse()) {
+        if (!konfirmasiString("Lanjutkan Fusion? y/n : ")) {
             cout << "Penggabungan Arcana Dibatalkan." << endl;
             return;
         }
@@ -769,12 +767,13 @@ void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr
         }
     }
 
-    cout << "\n=== Pilih Skill Warisan (maks 4) ===" << endl;
-    for (int i = 0; i < (int)semuaSkill.size(); i++)
+    cout << "\n=== Pilih Skill Warisan (maks 2) ===" << endl;
+    for (int i = 0; i < (int)semuaSkill.size(); i++) {
         cout << i + 1 << ". " << semuaSkill[i] << endl;
+    }
 
     vector<string> skillWarisanDipilih;
-    int jumlahMaks = min(4, (int)semuaSkill.size());
+    int jumlahMaks = min(2, (int)semuaSkill.size());
 
     while ((int)skillWarisanDipilih.size() < jumlahMaks) {
         int pilih = cekInteger("Pilih skill (0 jika selesai) : ");
@@ -785,10 +784,12 @@ void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr
             cout << "Nomor tidak valid!" << endl;
             continue;
         }
+
         if (skillSudahAda(skillWarisanDipilih, semuaSkill[pilih])) {
             cout << "Skill sudah dipilih!" << endl;
             continue;
         }
+
         skillWarisanDipilih.push_back(semuaSkill[pilih]);
         cout << semuaSkill[pilih] << " ditambahkan." << endl;
     }
@@ -810,11 +811,8 @@ void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr
         cout << hasilFusion.skills[i] << " ";
     cout << "\n==================================" << endl;
 
-    char jawaban;
-    cout << "Lanjutkan Special Fusion? y/n : ";
-    cin >> jawaban;
-    if (jawaban != 'y' && jawaban != 'Y') {
-        cout << "Special Fusion dibatalkan." << endl;
+    if (!konfirmasiString("Lanjutkan Fusion? y/n : ")) {
+        cout << "Penggabungan Arcana Dibatalkan." << endl;
         return;
     }
 

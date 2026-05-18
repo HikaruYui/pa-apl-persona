@@ -393,9 +393,10 @@ vector<LevelUser> loadUsersFromDB(MYSQL* conn) {
             "WHERE iu.user_id = " + to_string(u.id) + " "
             "ORDER BY sm.nama_skill";
 
-       if (mysql_query(conn, querySkill.c_str())) {
+        if (mysql_query(conn, querySkill.c_str())) {
             cerr << "Query inventory gagal: " << mysql_error(conn) << endl;
-            break;
+            daftar.push_back(u);
+            continue;
         }
 
         MYSQL_RES* resSkill = mysql_store_result(conn);
