@@ -5,7 +5,6 @@
 #include "utils.h"
 #include "database.h"
 
-void printPersona(persona p, bool tampilkanHarga);
 void lihatPersonaUtama();
 void cariPersona(vector<persona>* daftarPersona, int* status);
 void sortingPersona(vector<persona>* daftarPersona, int* status);
@@ -137,6 +136,14 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
             int low = 0;
             int high = daftarPersona->size() - 1;
             bool ketemu = false;
+
+            Table table;
+
+            if (*status == 1) {
+                table.add_row({"No", "Nama", "Level", "Arcana", "Harga", "Skill"});
+            } else {
+                table.add_row({"No", "Nama", "Level", "Arcana", "Skill"});
+            }
             
             while (low <= high) {
                 int mid = low + (high - low) / 2;
@@ -146,8 +153,27 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
                                [](unsigned char c){ return std::tolower(c); });
 
                 if (midNameLower == pilihanNama) {
-                    printPersona((*daftarPersona)[mid], *status == 1);
                     ketemu = true;
+
+                    if (*status == 1) {
+                        table.add_row({
+                            to_string(mid + 1),
+                            (*daftarPersona)[mid].nama,
+                            to_string((*daftarPersona)[mid].level),
+                            (*daftarPersona)[mid].arcana,
+                            to_string((*daftarPersona)[mid].harga),
+                            gabungSkill((*daftarPersona)[mid].skills)
+                        });
+                    } else {
+                        table.add_row({
+                            to_string(mid + 1),
+                            (*daftarPersona)[mid].nama,
+                            to_string((*daftarPersona)[mid].level),
+                            (*daftarPersona)[mid].arcana,
+                            gabungSkill((*daftarPersona)[mid].skills)
+                        });
+                    }
+
                     break;
                 } else if (midNameLower < pilihanNama) {
                     low = mid + 1;
@@ -155,32 +181,64 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
                     high = mid - 1;
                 }
             }
-            if (!ketemu) {
+
+            if (ketemu) {
+                cout << "\nData ditemukan!" << endl;
+                cout << table << endl;
+            } else {
                 cout << "tidak ada nama persona yang sama " << endl;
             }
+
             break;
         }
 
         case 2: { 
             int pilihanLevel = cekInteger("masukkan level Persona yang dicari : ");
             bool levelKetemu = false;
-            
 
-            for (int i = 0; i < daftarPersona->size(); i++) {
+            Table table;
 
+            if (*status == 1) {
+                table.add_row({"No", "Nama", "Level", "Arcana", "Harga", "Skill"});
+            } else {
+                table.add_row({"No", "Nama", "Level", "Arcana", "Skill"});
+            }
+
+            for (int i = 0; i < (int)daftarPersona->size(); i++) {
                 if (pilihanLevel == (*daftarPersona)[i].level) {
-                    if (!levelKetemu) {
-                    cout << "Data ditemukan! " << endl;
                     levelKetemu = true;
+
+                    if (*status == 1) {
+                        table.add_row({
+                            to_string(i + 1),
+                            (*daftarPersona)[i].nama,
+                            to_string((*daftarPersona)[i].level),
+                            (*daftarPersona)[i].arcana,
+                            to_string((*daftarPersona)[i].harga),
+                            gabungSkill((*daftarPersona)[i].skills)
+                        });
+                    } else {
+                        table.add_row({
+                            to_string(i + 1),
+                            (*daftarPersona)[i].nama,
+                            to_string((*daftarPersona)[i].level),
+                            (*daftarPersona)[i].arcana,
+                            gabungSkill((*daftarPersona)[i].skills)
+                        });
                     }
-                    printPersona((*daftarPersona)[i], *status == 1);
                 }
             }
-            if (!levelKetemu) {
+
+            if (levelKetemu) {
+                cout << "\nData ditemukan!" << endl;
+                cout << table << endl;
+            } else {
                 cout << "tidak ada level persona yang sama" << endl;
             }
+
             break; 
         } 
+
         default: {
             cout << "pilihan searching tidak valid" << endl;
             break;
@@ -188,36 +246,28 @@ void cariPersona(vector<persona>* daftarPersona, int* status) {
     }
 }
 
-void printPersona(persona p, bool tampilkanHarga) {
-    cout << "======" << p.nama << "======" << endl;
-    cout << "Level   : " << p.level << endl;
-    cout << "Arcana  : " << p.arcana << endl;
-
-    cout << "Skill   : ";
-    for (int i = 0; i < p.skills.size(); i++) {
-        cout << p.skills[i];
-
-        if (i < p.skills.size() - 1) {
-            cout << ", ";
-        }
-    }
-    cout << endl;
-
-    if (tampilkanHarga) {
-        cout << "Harga   : " << p.harga << endl; 
-    }
-}
-
 void lihatPersonaUtama() {
-     if (personaUtama.empty()) {
+    if (personaUtama.empty()) {
         cout << "Belum ada Persona" << endl;
         return;
     }
 
-    for (int i = 0; i < personaUtama.size(); i++) {
-        cout << "\nNo. " << i + 1 << endl; 
-        printPersona(personaUtama[i], true);
+    Table table;
+
+    table.add_row({"No", "Nama", "Level", "Arcana", "Harga", "Skill"});
+
+    for (int i = 0; i < (int)personaUtama.size(); i++) {
+        table.add_row({
+            to_string(i + 1),
+            personaUtama[i].nama,
+            to_string(personaUtama[i].level),
+            personaUtama[i].arcana,
+            to_string(personaUtama[i].harga),
+            gabungSkill(personaUtama[i].skills)
+        });
     }
+
+    cout << table << endl;
 }
 
 void tambahPersona(MYSQL* conn) {

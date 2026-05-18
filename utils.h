@@ -149,4 +149,18 @@ int cariAtauBuatProfil(const string& username) {
     return profilUser.size() - 1;
 }
 
+string gabungSkill (const vector<string>& skills) {
+    string hasil = "";
+
+    for (int i = 0; i < (int)skills.size(); i++) {
+        hasil += skills[i];
+
+    if (i < (int)skills.size() - 1) {
+        hasil += ", ";
+    }
+    }
+    return hasil;
+    
+}
+
 #endif

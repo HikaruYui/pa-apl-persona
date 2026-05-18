@@ -367,9 +367,20 @@ void updateSkillUser(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
         return;
     }
 
-    for (size_t i = 0; i < (*profilePtr).listPersona.size(); ++i) { 
-        cout << (i + 1) << ". " << (*profilePtr).listPersona[i].nama << endl; 
+    Table personaTable;
+    personaTable.add_row({"No", "Nama", "Level", "Arcana", "Skill"});
+
+    for (int i = 0; i < (int)(*profilePtr).listPersona.size(); ++i) { 
+        personaTable.add_row({
+            to_string(i + 1),
+            (*profilePtr).listPersona[i].nama,
+            to_string((*profilePtr).listPersona[i].level),
+            (*profilePtr).listPersona[i].arcana,
+            gabungSkill((*profilePtr).listPersona[i].skills)
+        });
     }
+
+    cout << personaTable << endl;
 
     int index = cekInteger("pilih nomor persona : ");
     index -= 1;
@@ -382,9 +393,16 @@ void updateSkillUser(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
             return;
         }
 
-        for (size_t j = 0; j < p.skills.size(); ++j) {
-            cout << (j + 1) << ". " << p.skills[j] << endl;
+        Table skillPersonaTable;
+        skillPersonaTable.add_row({"No", "Skill Persona"});
+
+        for (int j = 0; j < (int)p.skills.size(); ++j) {
+            skillPersonaTable.add_row({
+                to_string(j + 1),
+                p.skills[j]
+            });
         }
+        cout << skillPersonaTable << endl;
 
         int idxSkill = cekInteger("pilih nomor skill yang ingin diubah : ");
         idxSkill -= 1;
@@ -395,13 +413,23 @@ void updateSkillUser(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
                 cout << "Kamu belum punya skill card" << endl;
                 return;
             }
-            cout << "Daftar Skill card:" << endl;
 
-            for (size_t i = 0; i < userPtr->inventorySkill.size(); ++i) {
+            cout << "Daftar Skill card:" << endl;
+            Table skillCardTable;
+
+            skillCardTable.add_row({"No", "Nama Skill", "Jumlah"});
+            
+            for (int i = 0; i < (int)userPtr->inventorySkill.size(); ++i) {
                 list_skill_card = userPtr->inventorySkill[i];
-                cout << (i + 1) << ". " << list_skill_card.nama_skill << endl;
-                cout << "jumlah : " << list_skill_card.jumlah << endl;
+
+                skillCardTable.add_row({
+                    to_string(i + 1),
+                    list_skill_card.nama_skill,
+                    to_string(list_skill_card.jumlah)
+                });
             }
+
+            cout << skillCardTable << endl;
 
             int idxItem = cekInteger("pilih nomor skill card");
             idxItem -= 1;
@@ -560,15 +588,22 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     }
 
     cout << "\n=== Daftar Skill Item ===" << endl;
-    
+
+    Table table;
+    table.add_row({"No", "Nama Skill", "Harga"});
+
     for (int i = 0; i < (int)skillCardShop.size(); i++) {
         skillCard skillForSale = skillCardShop[i];
-        cout << i + 1 << ". " << skillForSale.nama_skill 
-             << " | Harga: " << skillForSale.harga << endl;
+
+        table.add_row({
+            to_string(i + 1),
+            skillForSale.nama_skill,
+            to_string(skillForSale.harga)
+        });
     }
+    cout << table << endl;
 
     int pilih = cekInteger("Pilih skill yang ingin dibeli (0 untuk batal): ");
-
     if (pilih == 0) {
         cout << "Batal membeli skill" << endl;
         return;
@@ -873,10 +908,21 @@ void lihatPersonaUser(personaUser* profilePtr) {
         cout << "Tidak ada persona yang dilihat" << endl;
         return;
     }
-    for (int i = 0; i < (*profilePtr).listPersona.size(); ++i) { 
-        cout << "\nNo. " << i + 1 << endl;
-        printPersona(profilePtr->listPersona[i], false);
+
+    Table table;
+    table.add_row({"No", "Nama", "Level", "Arcana", "Skill"});
+
+    for (int i = 0; i < (int)(*profilePtr).listPersona.size(); ++i) { 
+        table.add_row({
+            to_string(i + 1),
+            (*profilePtr).listPersona[i].nama,
+            to_string((*profilePtr).listPersona[i].level),
+            (*profilePtr).listPersona[i].arcana,
+            gabungSkill((*profilePtr).listPersona[i].skills)
+        });
     }
+
+    cout << table << endl;
 }
 
 

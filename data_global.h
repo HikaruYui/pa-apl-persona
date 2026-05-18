@@ -10,12 +10,14 @@
 #include <cctype>
 #include <stdexcept>
 #include <mysql/mysql.h>
+#include <tabulate/table.hpp>
 
 #define max_persona_user 10
 #define max_skill_persona 6
 #define max_skill_warisan 2
 
 using namespace std;
+using namespace tabulate;
 
 struct skill_card_user {
     int id;
