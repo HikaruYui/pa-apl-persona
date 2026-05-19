@@ -49,6 +49,10 @@ int main() {
                     cout << "status user tidak dikenali." << endl;
                 }
             }
+            else {
+                cout << "Login gagal 3 kali. Program keluar." << endl;
+                break;
+            }
         } 
         else if (pilihanUtama == 2) {
             registerUser(conn);

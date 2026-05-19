@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <mysql/mysql.h>
 #include <tabulate/table.hpp>
+#include <cstring>
 
 #define max_persona_user 10
 #define max_skill_persona 6
@@ -42,6 +43,8 @@ struct persona {
     string arcana;
     vector<string> skills;
     int harga;
+    bool isSpecial;
+    bool isSpecialMaterial;
 };
 
 struct personaUser {

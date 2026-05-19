@@ -16,18 +16,6 @@ bool skillSudahAda(const vector<string>& skills, string skillName) {
     return false;
 }
 
-bool konfirmasiFuse() {
-    char jawaban;
-
-    cout << "Apakah anda yakin ingin melakukan penggabungan persona? y/n";
-    cin >> jawaban;
-
-    if (jawaban == 'y' || jawaban == 'Y' ) {
-        return true;
-    }
-    return false;
-}
-
 bool hanyaSpasi(const string& teks) {
     for (int i = 0; i < (int)teks.length(); i++) {
         if (!isspace((unsigned char)teks[i])) {
@@ -45,7 +33,7 @@ string cekString(const string& prompt) {
             cout << prompt;
             getline(cin, input);
 
-            if (input.empty()) {
+            if (input.empty() || hanyaSpasi(input)) {
                 throw invalid_argument("Error: Input tidak boleh kosong");
             } 
 
@@ -161,6 +149,7 @@ int cekInteger(const string& prompt){
         }
     }
 }
+
 
 
 bool cekNamaPersona(const string& name, int excludeIndex = -1) {

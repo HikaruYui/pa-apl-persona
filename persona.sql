@@ -668,7 +668,8 @@ CREATE TABLE special_fusion_material (
     FOREIGN KEY (material_persona_id) REFERENCES persona(id)
 );
 
-ALTER TABLE `persona` ADD isSpecialMaterial BOOLEAN;
+ALTER TABLE `persona`
+ADD `isSpecialMaterial` tinyint(1) NOT NULL DEFAULT 0;
 
 UPDATE `persona` SET isSpecialMaterial = FALSE;
 UPDATE `persona` SET isSpecialMaterial = TRUE WHERE nama IN('Angel', 'Silky', 'Unicorn', 'Berith', 'Forneus');

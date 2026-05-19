@@ -103,14 +103,13 @@ void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
 
         int index = cekInteger("Pilih nomor persona yang ingin dibeli (0 untuk batal) : ");
 
-        
         if (index == 0) {
             cout << "batal membeli" << endl;
             return;
         }
 
         index--;
-        
+
         if (index < 0 || index >= (int)personaUtama.size()) {
             throw out_of_range("Nomor persona tidak valid");
         }
@@ -118,65 +117,188 @@ void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
         persona terbeli = personaUtama[index];
         terbeli.original_id = personaUtama[index].original_id;
 
-        if (terbeli.harga == 0) {
-            cout << "Persona special tidak bisa dibeli!" << endl;
+        // Kalau persona special, tidak boleh dibeli langsung.
+        if (terbeli.isSpecial) {
+            cout << "Persona special tidak bisa dibeli langsung!" << endl;
             return;
         }
 
-        if (userPtr->uang < personaUtama[index].harga) {
+        if (userPtr->uang < terbeli.harga) {
             throw runtime_error("Uang tidak cukup!");
         }
 
+        // Mulai transaksi karena proses beli persona mengubah beberapa tabel:
+        // 1. user_persona_collection
+        // 2. user_persona_equipped_skills
+        // 3. users
         if (mysql_query(conn, "START TRANSACTION")) {
             cout << "Gagal memulai transaksi: " << mysql_error(conn) << endl;
             return;
         }
 
-        string insertCollection =
-            "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
-            to_string(userPtr->id) + ", " +
-            to_string(terbeli.original_id) + ", " +
-            to_string(terbeli.level) + ")";
+        // INSERT ke user_persona_collection
+        const char* insertCollectionQuery =
+            "INSERT INTO user_persona_collection "
+            "(user_id, original_persona_id, level_saat_ini) "
+            "VALUES (?, ?, ?)";
 
-        if (mysql_query(conn, insertCollection.c_str())) {
-            cout << "Gagal menyimpan persona ke collection: " << mysql_error(conn) << endl;
+        MYSQL_STMT* insertCollectionStmt = mysql_stmt_init(conn);
+
+        if (insertCollectionStmt == NULL) {
+            cout << "Gagal init insert collection: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
 
-        int personaId = (int)mysql_insert_id(conn);
+        if (mysql_stmt_prepare(insertCollectionStmt, insertCollectionQuery, strlen(insertCollectionQuery))) {
+            cout << "Gagal prepare insert collection: " << mysql_stmt_error(insertCollectionStmt) << endl;
+            mysql_stmt_close(insertCollectionStmt);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        MYSQL_BIND collectionParam[3];
+        memset(collectionParam, 0, sizeof(collectionParam));
+
+        // Parameter 1: user_id
+        collectionParam[0].buffer_type = MYSQL_TYPE_LONG;
+        collectionParam[0].buffer = &userPtr->id;
+
+        // Parameter 2: original_persona_id
+        collectionParam[1].buffer_type = MYSQL_TYPE_LONG;
+        collectionParam[1].buffer = &terbeli.original_id;
+
+        // Parameter 3: level_saat_ini
+        collectionParam[2].buffer_type = MYSQL_TYPE_LONG;
+        collectionParam[2].buffer = &terbeli.level;
+
+        if (mysql_stmt_bind_param(insertCollectionStmt, collectionParam)) {
+            cout << "Gagal bind insert collection: " << mysql_stmt_error(insertCollectionStmt) << endl;
+            mysql_stmt_close(insertCollectionStmt);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_execute(insertCollectionStmt)) {
+            cout << "Gagal menyimpan persona ke collection: " << mysql_stmt_error(insertCollectionStmt) << endl;
+            mysql_stmt_close(insertCollectionStmt);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        int personaId = (int)mysql_stmt_insert_id(insertCollectionStmt);
+
+        mysql_stmt_close(insertCollectionStmt);
+
         terbeli.id = personaId;
 
-        for (const string& skill : terbeli.skills) {
-        int skillId = getOrCreateSkill(conn, skill);
+        // INSERT skill persona user
+        for (int i = 0; i < (int)terbeli.skills.size(); i++) {
+            string skill = terbeli.skills[i];
 
-        if (skillId == -1) {
-            mysql_query(conn, "ROLLBACK");
-            cout << "Gagal Menambah Persona: " << endl;
-            return;
+            int skillId = getOrCreateSkill(conn, skill);
+
+            if (skillId == -1) {
+                mysql_query(conn, "ROLLBACK");
+                cout << "Gagal Menambah Skill Persona" << endl;
+                return;
+            }
+
+            const char* insertSkillQuery =
+                "INSERT INTO user_persona_equipped_skills "
+                "(persona_instance_id, skill_id) "
+                "VALUES (?, ?)";
+
+            MYSQL_STMT* insertSkillStmt = mysql_stmt_init(conn);
+
+            if (insertSkillStmt == NULL) {
+                cout << "Gagal init insert skill user: " << mysql_error(conn) << endl;
+                mysql_query(conn, "ROLLBACK");
+                return;
+            }
+
+            if (mysql_stmt_prepare(insertSkillStmt, insertSkillQuery, strlen(insertSkillQuery))) {
+                cout << "Gagal prepare insert skill user: " << mysql_stmt_error(insertSkillStmt) << endl;
+                mysql_stmt_close(insertSkillStmt);
+                mysql_query(conn, "ROLLBACK");
+                return;
+            }
+
+            MYSQL_BIND skillParam[2];
+            memset(skillParam, 0, sizeof(skillParam));
+
+            // Parameter 1: persona_instance_id
+            skillParam[0].buffer_type = MYSQL_TYPE_LONG;
+            skillParam[0].buffer = &personaId;
+
+            // Parameter 2: skill_id
+            skillParam[1].buffer_type = MYSQL_TYPE_LONG;
+            skillParam[1].buffer = &skillId;
+
+            if (mysql_stmt_bind_param(insertSkillStmt, skillParam)) {
+                cout << "Gagal bind insert skill user: " << mysql_stmt_error(insertSkillStmt) << endl;
+                mysql_stmt_close(insertSkillStmt);
+                mysql_query(conn, "ROLLBACK");
+                return;
+            }
+
+            if (mysql_stmt_execute(insertSkillStmt)) {
+                cout << "Gagal Menambah Skill Persona: " << mysql_stmt_error(insertSkillStmt) << endl;
+                mysql_stmt_close(insertSkillStmt);
+                mysql_query(conn, "ROLLBACK");
+                return;
+            }
+
+            mysql_stmt_close(insertSkillStmt);
         }
 
-        string insertSkill = "INSERT INTO user_persona_equipped_skills (persona_instance_id, skill_id) VALUES (" +
-                              to_string(personaId) + ", " +
-                              to_string(skillId) + ")";
-
-        if (mysql_query(conn, insertSkill.c_str())) {
-            cout << "Gagal Menambah Skill Persona: " << mysql_error(conn) << endl;
-            mysql_query(conn, "ROLLBACK");
-            return;
-        }
-    }
-
+        // UPDATE uang user
         int uangBaru = userPtr->uang - terbeli.harga;
 
-        string updateUang =  "UPDATE users SET uang = " + to_string(uangBaru) +
-                             " WHERE id = " + to_string(userPtr->id);
+        const char* updateUangQuery =
+            "UPDATE users SET uang = ? WHERE id = ?";
 
-        if (mysql_query(conn, updateUang.c_str())) {
-            cout << "Gagal update uang user: " << mysql_error(conn) << endl;
+        MYSQL_STMT* updateUangStmt = mysql_stmt_init(conn);
+
+        if (updateUangStmt == NULL) {
+            cout << "Gagal init update uang: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
+
+        if (mysql_stmt_prepare(updateUangStmt, updateUangQuery, strlen(updateUangQuery))) {
+            cout << "Gagal prepare update uang: " << mysql_stmt_error(updateUangStmt) << endl;
+            mysql_stmt_close(updateUangStmt);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        MYSQL_BIND uangParam[2];
+        memset(uangParam, 0, sizeof(uangParam));
+
+        // Parameter 1: uang baru
+        uangParam[0].buffer_type = MYSQL_TYPE_LONG;
+        uangParam[0].buffer = &uangBaru;
+
+        // Parameter 2: user_id
+        uangParam[1].buffer_type = MYSQL_TYPE_LONG;
+        uangParam[1].buffer = &userPtr->id;
+
+        if (mysql_stmt_bind_param(updateUangStmt, uangParam)) {
+            cout << "Gagal bind update uang: " << mysql_stmt_error(updateUangStmt) << endl;
+            mysql_stmt_close(updateUangStmt);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_execute(updateUangStmt)) {
+            cout << "Gagal update uang user: " << mysql_stmt_error(updateUangStmt) << endl;
+            mysql_stmt_close(updateUangStmt);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        mysql_stmt_close(updateUangStmt);
 
         if (mysql_query(conn, "COMMIT")) {
             cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
@@ -290,59 +412,202 @@ void fusePersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
             return;
         }
 
-        string insertCollection =
-            "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
-            to_string(userPtr->id) + ", " +
-            to_string(hasilFusion.original_id) + ", " +
-            to_string(hasilFusion.level) + ")";
+        const char* insertCollectionQuery =
+    "INSERT INTO user_persona_collection "
+    "(user_id, original_persona_id, level_saat_ini) "
+    "VALUES (?, ?, ?)";
 
-        if (mysql_query(conn, insertCollection.c_str())) {
-            cout << "Gagal menyimpan persona ke collection: " << mysql_error(conn) << endl;
-            mysql_query(conn, "ROLLBACK");
-            return;
-        }
+MYSQL_STMT* stmtCollection = mysql_stmt_init(conn);
 
-        int id_persona = (int)mysql_insert_id(conn);
-        hasilFusion.id = id_persona;
+if (stmtCollection == NULL) {
+    cout << "Gagal init simpan persona fusion: " << mysql_error(conn) << endl;
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
 
-        for (int i = 0; i < (int)hasilFusion.skills.size(); i++) {
-        int skillId = getOrCreateSkill(conn, hasilFusion.skills[i]);
+if (mysql_stmt_prepare(stmtCollection, insertCollectionQuery, strlen(insertCollectionQuery))) {
+    cout << "Gagal prepare simpan persona fusion: " << mysql_stmt_error(stmtCollection) << endl;
+    mysql_stmt_close(stmtCollection);
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
 
-        if (skillId == -1) {
-            mysql_query(conn, "ROLLBACK");
-            return;
-        }
-        
-        string insertSkill = 
-            "INSERT INTO user_persona_equipped_skills (persona_instance_id, skill_id) VALUES (" +
-            to_string(id_persona) + ", " +
-            to_string(skillId) + ")";
+MYSQL_BIND paramCollection[3];
+memset(paramCollection, 0, sizeof(paramCollection));
 
-        if (mysql_query(conn, insertSkill.c_str())) {
-            cout << "Gagal menyimpan skill special fusion: " << mysql_error(conn) << endl;
-            mysql_query(conn, "ROLLBACK");
-            return;
-        }
+paramCollection[0].buffer_type = MYSQL_TYPE_LONG;
+paramCollection[0].buffer = &userPtr->id;
+
+paramCollection[1].buffer_type = MYSQL_TYPE_LONG;
+paramCollection[1].buffer = &hasilFusion.original_id;
+
+paramCollection[2].buffer_type = MYSQL_TYPE_LONG;
+paramCollection[2].buffer = &hasilFusion.level;
+
+if (mysql_stmt_bind_param(stmtCollection, paramCollection)) {
+    cout << "Gagal bind simpan persona fusion: " << mysql_stmt_error(stmtCollection) << endl;
+    mysql_stmt_close(stmtCollection);
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
+
+if (mysql_stmt_execute(stmtCollection)) {
+    cout << "Gagal menyimpan persona ke collection: " << mysql_stmt_error(stmtCollection) << endl;
+    mysql_stmt_close(stmtCollection);
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
+
+int id_persona = (int)mysql_stmt_insert_id(stmtCollection);
+mysql_stmt_close(stmtCollection);
+
+hasilFusion.id = id_persona;
+
+for (int i = 0; i < (int)hasilFusion.skills.size(); i++) {
+    int skillId = getOrCreateSkill(conn, hasilFusion.skills[i]);
+
+    if (skillId == -1) {
+        mysql_query(conn, "ROLLBACK");
+        return;
     }
 
-        string queryHapusSkillUser = "DELETE FROM user_persona_equipped_skills WHERE "
-        "persona_instance_id IN("+ to_string(parent1.id) +", "+ to_string(parent2.id) +" )";
+    const char* insertSkillQuery =
+        "INSERT INTO user_persona_equipped_skills "
+        "(persona_instance_id, skill_id) "
+        "VALUES (?, ?)";
 
-        if (mysql_query(conn, queryHapusSkillUser.c_str())) {
-            cout << "Gagal hapus skill persona user: " << mysql_error(conn) << endl;
+    MYSQL_STMT* stmtSkill = mysql_stmt_init(conn);
+
+    if (stmtSkill == NULL) {
+        cout << "Gagal init simpan skill fusion: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_prepare(stmtSkill, insertSkillQuery, strlen(insertSkillQuery))) {
+        cout << "Gagal prepare simpan skill fusion: " << mysql_stmt_error(stmtSkill) << endl;
+        mysql_stmt_close(stmtSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    MYSQL_BIND paramSkill[2];
+    memset(paramSkill, 0, sizeof(paramSkill));
+
+    paramSkill[0].buffer_type = MYSQL_TYPE_LONG;
+    paramSkill[0].buffer = &id_persona;
+
+    paramSkill[1].buffer_type = MYSQL_TYPE_LONG;
+    paramSkill[1].buffer = &skillId;
+
+    if (mysql_stmt_bind_param(stmtSkill, paramSkill)) {
+        cout << "Gagal bind simpan skill fusion: " << mysql_stmt_error(stmtSkill) << endl;
+        mysql_stmt_close(stmtSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtSkill)) {
+        cout << "Gagal menyimpan skill fusion: " << mysql_stmt_error(stmtSkill) << endl;
+        mysql_stmt_close(stmtSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtSkill);
+}
+
+        const char* deleteSkillQuery =
+            "DELETE FROM user_persona_equipped_skills "
+            "WHERE persona_instance_id IN (?, ?)";
+
+        MYSQL_STMT* stmtDeleteSkill = mysql_stmt_init(conn);
+
+        if (stmtDeleteSkill == NULL) {
+            cout << "Gagal init hapus skill parent: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
 
-        string queryHapusPersonaUser = "DELETE FROM user_persona_collection WHERE "
-        "user_id = "+ to_string(userPtr->id) +" "
-        "AND persona_instance_id IN("+ to_string(parent1.id) +", "+ to_string(parent2.id) +" )";
-
-        if (mysql_query(conn, queryHapusPersonaUser.c_str())) {
-            cout << "Gagal hapus persona user: " << mysql_error(conn) << endl;
+        if (mysql_stmt_prepare(stmtDeleteSkill, deleteSkillQuery, strlen(deleteSkillQuery))) {
+            cout << "Gagal prepare hapus skill parent: " << mysql_stmt_error(stmtDeleteSkill) << endl;
+            mysql_stmt_close(stmtDeleteSkill);
             mysql_query(conn, "ROLLBACK");
             return;
         }
+
+        MYSQL_BIND paramDeleteSkill[2];
+        memset(paramDeleteSkill, 0, sizeof(paramDeleteSkill));
+
+        paramDeleteSkill[0].buffer_type = MYSQL_TYPE_LONG;
+        paramDeleteSkill[0].buffer = &parent1.id;
+
+        paramDeleteSkill[1].buffer_type = MYSQL_TYPE_LONG;
+        paramDeleteSkill[1].buffer = &parent2.id;
+
+        if (mysql_stmt_bind_param(stmtDeleteSkill, paramDeleteSkill)) {
+            cout << "Gagal bind hapus skill parent: " << mysql_stmt_error(stmtDeleteSkill) << endl;
+            mysql_stmt_close(stmtDeleteSkill);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_execute(stmtDeleteSkill)) {
+            cout << "Gagal hapus skill persona user: " << mysql_stmt_error(stmtDeleteSkill) << endl;
+            mysql_stmt_close(stmtDeleteSkill);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        mysql_stmt_close(stmtDeleteSkill);
+
+        const char* deletePersonaQuery =
+            "DELETE FROM user_persona_collection "
+            "WHERE user_id = ? "
+            "AND persona_instance_id IN (?, ?)";
+
+        MYSQL_STMT* stmtDeletePersona = mysql_stmt_init(conn);
+
+        if (stmtDeletePersona == NULL) {
+            cout << "Gagal init hapus persona parent: " << mysql_error(conn) << endl;
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_prepare(stmtDeletePersona, deletePersonaQuery, strlen(deletePersonaQuery))) {
+            cout << "Gagal prepare hapus persona parent: " << mysql_stmt_error(stmtDeletePersona) << endl;
+            mysql_stmt_close(stmtDeletePersona);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        MYSQL_BIND paramDeletePersona[3];
+        memset(paramDeletePersona, 0, sizeof(paramDeletePersona));
+
+        paramDeletePersona[0].buffer_type = MYSQL_TYPE_LONG;
+        paramDeletePersona[0].buffer = &userPtr->id;
+
+        paramDeletePersona[1].buffer_type = MYSQL_TYPE_LONG;
+        paramDeletePersona[1].buffer = &parent1.id;
+
+        paramDeletePersona[2].buffer_type = MYSQL_TYPE_LONG;
+        paramDeletePersona[2].buffer = &parent2.id;
+
+        if (mysql_stmt_bind_param(stmtDeletePersona, paramDeletePersona)) {
+            cout << "Gagal bind hapus persona parent: " << mysql_stmt_error(stmtDeletePersona) << endl;
+            mysql_stmt_close(stmtDeletePersona);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_execute(stmtDeletePersona)) {
+            cout << "Gagal hapus persona user: " << mysql_stmt_error(stmtDeletePersona) << endl;
+            mysql_stmt_close(stmtDeletePersona);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        mysql_stmt_close(stmtDeletePersona);
 
         if (mysql_query(conn, "COMMIT")) {
             cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
@@ -454,48 +719,161 @@ void updateSkillUser(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
                     bool hapusInventory = false;
 
                     if (list_skill_card.jumlah == 1) {
-
-                        string queryDeleteInventory = 
+                        const char* queryDeleteInventory =
                             "DELETE FROM inventori_user "
-                            "WHERE user_id = " + to_string(userPtr->id) + " "
-                            "AND skill_tersimpan = " + to_string(list_skill_card.id);
+                            "WHERE user_id = ? AND skill_tersimpan = ?";
 
-                        if (mysql_query(conn, queryDeleteInventory.c_str())){
-                            cerr << "Query update inventory user gagal: " << mysql_error(conn) << endl;
+                        MYSQL_STMT* stmtDeleteInventory = mysql_stmt_init(conn);
+
+                        if (stmtDeleteInventory == NULL) {
+                            cout << "Gagal init delete inventory: " << mysql_error(conn) << endl;
                             mysql_query(conn, "ROLLBACK");
                             return;
                         }
-                        
+
+                        if (mysql_stmt_prepare(stmtDeleteInventory, queryDeleteInventory, strlen(queryDeleteInventory))) {
+                            cout << "Gagal prepare delete inventory: " << mysql_stmt_error(stmtDeleteInventory) << endl;
+                            mysql_stmt_close(stmtDeleteInventory);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        MYSQL_BIND paramDeleteInventory[2];
+                        memset(paramDeleteInventory, 0, sizeof(paramDeleteInventory));
+
+                        paramDeleteInventory[0].buffer_type = MYSQL_TYPE_LONG;
+                        paramDeleteInventory[0].buffer = &userPtr->id;
+
+                        paramDeleteInventory[1].buffer_type = MYSQL_TYPE_LONG;
+                        paramDeleteInventory[1].buffer = &list_skill_card.id;
+
+                        if (mysql_stmt_bind_param(stmtDeleteInventory, paramDeleteInventory)) {
+                            cout << "Gagal bind delete inventory: " << mysql_stmt_error(stmtDeleteInventory) << endl;
+                            mysql_stmt_close(stmtDeleteInventory);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        if (mysql_stmt_execute(stmtDeleteInventory)) {
+                            cerr << "Query delete inventory user gagal: " << mysql_stmt_error(stmtDeleteInventory) << endl;
+                            mysql_stmt_close(stmtDeleteInventory);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        mysql_stmt_close(stmtDeleteInventory);
                         hapusInventory = true;
-                        } 
-                        else {
-                            string queryUpdateInventory = 
-                                "UPDATE inventori_user SET "
-                                "jumlah_skill_card = " + to_string(userPtr->inventorySkill[idxItem].jumlah - 1) + " "
-                                "WHERE user_id = " + to_string(userPtr->id) + " "
-                                "AND skill_tersimpan = " + to_string(userPtr->inventorySkill[idxItem].id);
+                    }
+                    else {
+                        int jumlahBaru = userPtr->inventorySkill[idxItem].jumlah - 1;
 
-                            if (mysql_query(conn, queryUpdateInventory.c_str())){
-                                cerr << "Query update inventory gagal: " << mysql_error(conn) << endl;
-                                mysql_query(conn, "ROLLBACK");
-                                return;
-                            }
-                        }
+                        const char* queryUpdateInventory =
+                            "UPDATE inventori_user SET jumlah_skill_card = ? "
+                            "WHERE user_id = ? AND skill_tersimpan = ?";
 
-                        string skillLamaEsc = escapeSQL(conn, editedPersona.skills[idxSkill]);
+                        MYSQL_STMT* stmtUpdateInventory = mysql_stmt_init(conn);
 
-                        string queryUpdateSkill = 
-                            "UPDATE user_persona_equipped_skills SET skill_id = " + to_string(list_skill_card.id) + " "
-                            "WHERE persona_instance_id = " + to_string(editedPersona.id) + " "
-                            "AND skill_id = (SELECT id FROM skill_master WHERE nama_skill = '" + skillLamaEsc + "')";
-
-                        if (mysql_query(conn, queryUpdateSkill.c_str())){
-                            cerr << "Query update skill persona user gagal: " << mysql_error(conn) << endl;
+                        if (stmtUpdateInventory == NULL) {
+                            cout << "Gagal init update inventory: " << mysql_error(conn) << endl;
                             mysql_query(conn, "ROLLBACK");
                             return;
                         }
 
-                        if (mysql_affected_rows(conn) == 0) {
+                        if (mysql_stmt_prepare(stmtUpdateInventory, queryUpdateInventory, strlen(queryUpdateInventory))) {
+                            cout << "Gagal prepare update inventory: " << mysql_stmt_error(stmtUpdateInventory) << endl;
+                            mysql_stmt_close(stmtUpdateInventory);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        MYSQL_BIND paramUpdateInventory[3];
+                        memset(paramUpdateInventory, 0, sizeof(paramUpdateInventory));
+
+                        paramUpdateInventory[0].buffer_type = MYSQL_TYPE_LONG;
+                        paramUpdateInventory[0].buffer = &jumlahBaru;
+
+                        paramUpdateInventory[1].buffer_type = MYSQL_TYPE_LONG;
+                        paramUpdateInventory[1].buffer = &userPtr->id;
+
+                        paramUpdateInventory[2].buffer_type = MYSQL_TYPE_LONG;
+                        paramUpdateInventory[2].buffer = &userPtr->inventorySkill[idxItem].id;
+
+                        if (mysql_stmt_bind_param(stmtUpdateInventory, paramUpdateInventory)) {
+                            cout << "Gagal bind update inventory: " << mysql_stmt_error(stmtUpdateInventory) << endl;
+                            mysql_stmt_close(stmtUpdateInventory);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        if (mysql_stmt_execute(stmtUpdateInventory)) {
+                            cerr << "Query update inventory gagal: " << mysql_stmt_error(stmtUpdateInventory) << endl;
+                            mysql_stmt_close(stmtUpdateInventory);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        mysql_stmt_close(stmtUpdateInventory);
+                    }
+
+                        int skillLamaId = getOrCreateSkill(conn, editedPersona.skills[idxSkill]);
+
+                        if (skillLamaId == -1) {
+                            cout << "Gagal mendapatkan ID skill lama" << endl;
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        const char* queryUpdateSkill =
+                            "UPDATE user_persona_equipped_skills "
+                            "SET skill_id = ? "
+                            "WHERE persona_instance_id = ? AND skill_id = ?";
+
+                        MYSQL_STMT* stmtUpdateSkill = mysql_stmt_init(conn);
+
+                        if (stmtUpdateSkill == NULL) {
+                            cout << "Gagal init update skill user: " << mysql_error(conn) << endl;
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        if (mysql_stmt_prepare(stmtUpdateSkill, queryUpdateSkill, strlen(queryUpdateSkill))) {
+                            cout << "Gagal prepare update skill user: " << mysql_stmt_error(stmtUpdateSkill) << endl;
+                            mysql_stmt_close(stmtUpdateSkill);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        MYSQL_BIND paramUpdateSkill[3];
+                        memset(paramUpdateSkill, 0, sizeof(paramUpdateSkill));
+
+                        paramUpdateSkill[0].buffer_type = MYSQL_TYPE_LONG;
+                        paramUpdateSkill[0].buffer = &list_skill_card.id;
+
+                        paramUpdateSkill[1].buffer_type = MYSQL_TYPE_LONG;
+                        paramUpdateSkill[1].buffer = &editedPersona.id;
+
+                        paramUpdateSkill[2].buffer_type = MYSQL_TYPE_LONG;
+                        paramUpdateSkill[2].buffer = &skillLamaId;
+
+                        if (mysql_stmt_bind_param(stmtUpdateSkill, paramUpdateSkill)) {
+                            cout << "Gagal bind update skill user: " << mysql_stmt_error(stmtUpdateSkill) << endl;
+                            mysql_stmt_close(stmtUpdateSkill);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        if (mysql_stmt_execute(stmtUpdateSkill)) {
+                            cerr << "Query update skill persona user gagal: " << mysql_stmt_error(stmtUpdateSkill) << endl;
+                            mysql_stmt_close(stmtUpdateSkill);
+                            mysql_query(conn, "ROLLBACK");
+                            return;
+                        }
+
+                        int affectedRows = mysql_stmt_affected_rows(stmtUpdateSkill);
+
+                        mysql_stmt_close(stmtUpdateSkill);
+
+                        if (affectedRows == 0) {
                             cout << "Skill lama tidak ditemukan di database." << endl;
                             mysql_query(conn, "ROLLBACK");
                             return;
@@ -553,25 +931,87 @@ void hapusPersonaUser(MYSQL* conn, personaUser* profilePtr) {
         return;
     }
 
-    string queryHapusSkillUser =
-        "DELETE FROM user_persona_equipped_skills WHERE persona_instance_id = " +
-        to_string(deletedPersona.id);
+    const char* queryHapusSkillUser =
+        "DELETE FROM user_persona_equipped_skills "
+        "WHERE persona_instance_id = ?";
 
-    if (mysql_query(conn, queryHapusSkillUser.c_str())) {
-        cout << "Gagal hapus skill persona user: " << mysql_error(conn) << endl;
+    MYSQL_STMT* stmtHapusSkill = mysql_stmt_init(conn);
+
+    if (stmtHapusSkill == NULL) {
+        cout << "Gagal init hapus skill persona user: " << mysql_error(conn) << endl;
         mysql_query(conn, "ROLLBACK");
         return;
     }
 
-    string queryHapusPersonaUser =
-        "DELETE FROM user_persona_collection WHERE persona_instance_id = " +
-        to_string(deletedPersona.id);
-
-    if (mysql_query(conn, queryHapusPersonaUser.c_str())) {
-        cout << "Gagal hapus persona user: " << mysql_error(conn) << endl;
+    if (mysql_stmt_prepare(stmtHapusSkill, queryHapusSkillUser, strlen(queryHapusSkillUser))) {
+        cout << "Gagal prepare hapus skill persona user: " << mysql_stmt_error(stmtHapusSkill) << endl;
+        mysql_stmt_close(stmtHapusSkill);
         mysql_query(conn, "ROLLBACK");
         return;
     }
+
+    MYSQL_BIND paramHapusSkill[1];
+    memset(paramHapusSkill, 0, sizeof(paramHapusSkill));
+
+    paramHapusSkill[0].buffer_type = MYSQL_TYPE_LONG;
+    paramHapusSkill[0].buffer = &deletedPersona.id;
+
+    if (mysql_stmt_bind_param(stmtHapusSkill, paramHapusSkill)) {
+        cout << "Gagal bind hapus skill persona user: " << mysql_stmt_error(stmtHapusSkill) << endl;
+        mysql_stmt_close(stmtHapusSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtHapusSkill)) {
+        cout << "Gagal hapus skill persona user: " << mysql_stmt_error(stmtHapusSkill) << endl;
+        mysql_stmt_close(stmtHapusSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtHapusSkill);
+
+    const char* queryHapusPersonaUser =
+        "DELETE FROM user_persona_collection "
+        "WHERE persona_instance_id = ?";
+
+    MYSQL_STMT* stmtHapusPersona = mysql_stmt_init(conn);
+
+    if (stmtHapusPersona == NULL) {
+        cout << "Gagal init hapus persona user: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_prepare(stmtHapusPersona, queryHapusPersonaUser, strlen(queryHapusPersonaUser))) {
+        cout << "Gagal prepare hapus persona user: " << mysql_stmt_error(stmtHapusPersona) << endl;
+        mysql_stmt_close(stmtHapusPersona);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    MYSQL_BIND paramHapusPersona[1];
+    memset(paramHapusPersona, 0, sizeof(paramHapusPersona));
+
+    paramHapusPersona[0].buffer_type = MYSQL_TYPE_LONG;
+    paramHapusPersona[0].buffer = &deletedPersona.id;
+
+    if (mysql_stmt_bind_param(stmtHapusPersona, paramHapusPersona)) {
+        cout << "Gagal bind hapus persona user: " << mysql_stmt_error(stmtHapusPersona) << endl;
+        mysql_stmt_close(stmtHapusPersona);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtHapusPersona)) {
+        cout << "Gagal hapus persona user: " << mysql_stmt_error(stmtHapusPersona) << endl;
+        mysql_stmt_close(stmtHapusPersona);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtHapusPersona);
 
     if (mysql_query(conn, "COMMIT")) {
         cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
@@ -604,9 +1044,11 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
             to_string(skillForSale.harga)
         });
     }
+
     cout << table << endl;
 
     int pilih = cekInteger("Pilih skill yang ingin dibeli (0 untuk batal): ");
+
     if (pilih == 0) {
         cout << "Batal membeli skill" << endl;
         return;
@@ -645,28 +1087,101 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     skill_card_user skillBaru;
 
     if (sudahAda) {
-        string queryUpdate =
-            "UPDATE inventori_user SET jumlah_skill_card = jumlah_skill_card + 1 "
-            "WHERE user_id = " + to_string(userPtr->id) + " "
-            "AND skill_tersimpan = " + to_string(skillTerbeli.original_id);
+        const char* queryUpdate =
+            "UPDATE inventori_user "
+            "SET jumlah_skill_card = jumlah_skill_card + 1 "
+            "WHERE user_id = ? AND skill_tersimpan = ?";
 
-        if (mysql_query(conn, queryUpdate.c_str())) {
-            cerr << "Query update inventory gagal: " << mysql_error(conn) << endl;
+        MYSQL_STMT* stmtUpdate = mysql_stmt_init(conn);
+
+        if (stmtUpdate == NULL) {
+            cout << "Gagal init update inventory: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
+
+        if (mysql_stmt_prepare(stmtUpdate, queryUpdate, strlen(queryUpdate))) {
+            cout << "Gagal prepare update inventory: " << mysql_stmt_error(stmtUpdate) << endl;
+            mysql_stmt_close(stmtUpdate);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        MYSQL_BIND paramUpdate[2];
+        memset(paramUpdate, 0, sizeof(paramUpdate));
+
+        paramUpdate[0].buffer_type = MYSQL_TYPE_LONG;
+        paramUpdate[0].buffer = &userPtr->id;
+
+        paramUpdate[1].buffer_type = MYSQL_TYPE_LONG;
+        paramUpdate[1].buffer = &skillTerbeli.original_id;
+
+        if (mysql_stmt_bind_param(stmtUpdate, paramUpdate)) {
+            cout << "Gagal bind update inventory: " << mysql_stmt_error(stmtUpdate) << endl;
+            mysql_stmt_close(stmtUpdate);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_execute(stmtUpdate)) {
+            cerr << "Query update inventory gagal: " << mysql_stmt_error(stmtUpdate) << endl;
+            mysql_stmt_close(stmtUpdate);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        mysql_stmt_close(stmtUpdate);
     } else {
-        string queryInsert =
-            "INSERT INTO inventori_user (user_id, skill_tersimpan, jumlah_skill_card) VALUES (" +
-            to_string(userPtr->id) + ", " +
-            to_string(skillTerbeli.original_id) + ", 1)";
+        const char* queryInsert =
+            "INSERT INTO inventori_user "
+            "(user_id, skill_tersimpan, jumlah_skill_card) "
+            "VALUES (?, ?, ?)";
 
-        if (mysql_query(conn, queryInsert.c_str())) {
-            cerr << "Query insert inventori gagal: " << mysql_error(conn) << endl;
+        MYSQL_STMT* stmtInsert = mysql_stmt_init(conn);
+
+        if (stmtInsert == NULL) {
+            cout << "Gagal init insert inventory: " << mysql_error(conn) << endl;
             mysql_query(conn, "ROLLBACK");
             return;
         }
-        
+
+        if (mysql_stmt_prepare(stmtInsert, queryInsert, strlen(queryInsert))) {
+            cout << "Gagal prepare insert inventory: " << mysql_stmt_error(stmtInsert) << endl;
+            mysql_stmt_close(stmtInsert);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        int jumlahAwal = 1;
+
+        MYSQL_BIND paramInsert[3];
+        memset(paramInsert, 0, sizeof(paramInsert));
+
+        paramInsert[0].buffer_type = MYSQL_TYPE_LONG;
+        paramInsert[0].buffer = &userPtr->id;
+
+        paramInsert[1].buffer_type = MYSQL_TYPE_LONG;
+        paramInsert[1].buffer = &skillTerbeli.original_id;
+
+        paramInsert[2].buffer_type = MYSQL_TYPE_LONG;
+        paramInsert[2].buffer = &jumlahAwal;
+
+        if (mysql_stmt_bind_param(stmtInsert, paramInsert)) {
+            cout << "Gagal bind insert inventory: " << mysql_stmt_error(stmtInsert) << endl;
+            mysql_stmt_close(stmtInsert);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        if (mysql_stmt_execute(stmtInsert)) {
+            cerr << "Query insert inventori gagal: " << mysql_stmt_error(stmtInsert) << endl;
+            mysql_stmt_close(stmtInsert);
+            mysql_query(conn, "ROLLBACK");
+            return;
+        }
+
+        mysql_stmt_close(stmtInsert);
+
         skillBaru.id = skillTerbeli.original_id;
         skillBaru.nama_skill = skillTerbeli.nama_skill;
         skillBaru.jumlah = 1;
@@ -674,15 +1189,48 @@ void beliSkill(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
 
     int uangBaru = userPtr->uang - skillTerbeli.harga;
 
-    string updateUang =
-        "UPDATE users SET uang = " + to_string(uangBaru) +
-        " WHERE id = " + to_string(userPtr->id);
+    const char* queryUpdateUang =
+        "UPDATE users SET uang = ? WHERE id = ?";
 
-    if (mysql_query(conn, updateUang.c_str())) {
-        cout << "Query update uang gagal: " << mysql_error(conn) << endl;
+    MYSQL_STMT* stmtUang = mysql_stmt_init(conn);
+
+    if (stmtUang == NULL) {
+        cout << "Gagal init update uang: " << mysql_error(conn) << endl;
         mysql_query(conn, "ROLLBACK");
         return;
     }
+
+    if (mysql_stmt_prepare(stmtUang, queryUpdateUang, strlen(queryUpdateUang))) {
+        cout << "Gagal prepare update uang: " << mysql_stmt_error(stmtUang) << endl;
+        mysql_stmt_close(stmtUang);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    MYSQL_BIND paramUang[2];
+    memset(paramUang, 0, sizeof(paramUang));
+
+    paramUang[0].buffer_type = MYSQL_TYPE_LONG;
+    paramUang[0].buffer = &uangBaru;
+
+    paramUang[1].buffer_type = MYSQL_TYPE_LONG;
+    paramUang[1].buffer = &userPtr->id;
+
+    if (mysql_stmt_bind_param(stmtUang, paramUang)) {
+        cout << "Gagal bind update uang: " << mysql_stmt_error(stmtUang) << endl;
+        mysql_stmt_close(stmtUang);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtUang)) {
+        cout << "Query update uang gagal: " << mysql_stmt_error(stmtUang) << endl;
+        mysql_stmt_close(stmtUang);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtUang);
 
     if (mysql_query(conn, "COMMIT")) {
         cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
@@ -826,69 +1374,216 @@ void fusePersonaSpecial(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr
         return;
     }
 
-    string insertCollection =
-         "INSERT INTO user_persona_collection (user_id, original_persona_id, level_saat_ini) VALUES (" +
-        to_string(userPtr->id) + ", " +
-        to_string(hasilFusion.original_id) + ", " +
-        to_string(hasilFusion.level) + ")";
+    const char* insertCollectionQuery =
+    "INSERT INTO user_persona_collection "
+    "(user_id, original_persona_id, level_saat_ini) "
+    "VALUES (?, ?, ?)";
 
-    if (mysql_query(conn, insertCollection.c_str())) {
-        cout << "Gagal menyimpan hasil special fusion: " << mysql_error(conn) << endl;
+MYSQL_STMT* stmtCollection = mysql_stmt_init(conn);
+
+if (stmtCollection == NULL) {
+    cout << "Gagal init hasil special fusion: " << mysql_error(conn) << endl;
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
+
+if (mysql_stmt_prepare(stmtCollection, insertCollectionQuery, strlen(insertCollectionQuery))) {
+    cout << "Gagal prepare hasil special fusion: " << mysql_stmt_error(stmtCollection) << endl;
+    mysql_stmt_close(stmtCollection);
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
+
+MYSQL_BIND paramCollection[3];
+memset(paramCollection, 0, sizeof(paramCollection));
+
+paramCollection[0].buffer_type = MYSQL_TYPE_LONG;
+paramCollection[0].buffer = &userPtr->id;
+
+paramCollection[1].buffer_type = MYSQL_TYPE_LONG;
+paramCollection[1].buffer = &hasilFusion.original_id;
+
+paramCollection[2].buffer_type = MYSQL_TYPE_LONG;
+paramCollection[2].buffer = &hasilFusion.level;
+
+if (mysql_stmt_bind_param(stmtCollection, paramCollection)) {
+    cout << "Gagal bind hasil special fusion: " << mysql_stmt_error(stmtCollection) << endl;
+    mysql_stmt_close(stmtCollection);
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
+
+if (mysql_stmt_execute(stmtCollection)) {
+    cout << "Gagal menyimpan hasil special fusion: " << mysql_stmt_error(stmtCollection) << endl;
+    mysql_stmt_close(stmtCollection);
+    mysql_query(conn, "ROLLBACK");
+    return;
+}
+
+int hasilInstanceId = (int)mysql_stmt_insert_id(stmtCollection);
+mysql_stmt_close(stmtCollection);
+
+hasilFusion.id = hasilInstanceId;
+
+for (int i = 0; i < (int)hasilFusion.skills.size(); i++) {
+    int skillId = getOrCreateSkill(conn, hasilFusion.skills[i]);
+
+    if (skillId == -1) {
         mysql_query(conn, "ROLLBACK");
         return;
     }
 
-    int hasilInstanceId = (int)mysql_insert_id(conn);
-    hasilFusion.id = hasilInstanceId;
+    const char* insertSkillQuery =
+        "INSERT INTO user_persona_equipped_skills "
+        "(persona_instance_id, skill_id) "
+        "VALUES (?, ?)";
 
-    for (int i = 0; i < (int)hasilFusion.skills.size(); i++) {
-        int skillId = getOrCreateSkill(conn, hasilFusion.skills[i]);
+    MYSQL_STMT* stmtSkill = mysql_stmt_init(conn);
 
-        if (skillId == -1) {
-            mysql_query(conn, "ROLLBACK");
-            return;
-        }
-
-        string insertSkill = 
-            "INSERT INTO user_persona_equipped_skills (persona_instance_id, skill_id) VALUES (" +
-            to_string(hasilInstanceId) + ", " +
-            to_string(skillId) + ")";
-
-        if (mysql_query(conn, insertSkill.c_str())) {
-            cout << "Gagal menyimpan skill special fusion: " << mysql_error(conn) << endl;
-            mysql_query(conn, "ROLLBACK");
-            return;
-        }
+    if (stmtSkill == NULL) {
+        cout << "Gagal init skill special fusion: " << mysql_error(conn) << endl;
+        mysql_query(conn, "ROLLBACK");
+        return;
     }
 
-    string idHapus = "";
-    for (int i = 0; i < (int)parents.size(); i++) {
-        if (i > 0) {
-            idHapus += ", ";
-        }
-        idHapus += to_string(parents[i].id);
+    if (mysql_stmt_prepare(stmtSkill, insertSkillQuery, strlen(insertSkillQuery))) {
+        cout << "Gagal prepare skill special fusion: " << mysql_stmt_error(stmtSkill) << endl;
+        mysql_stmt_close(stmtSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
     }
 
-    string deleteSkill = 
+    MYSQL_BIND paramSkill[2];
+    memset(paramSkill, 0, sizeof(paramSkill));
+
+    paramSkill[0].buffer_type = MYSQL_TYPE_LONG;
+    paramSkill[0].buffer = &hasilInstanceId;
+
+    paramSkill[1].buffer_type = MYSQL_TYPE_LONG;
+    paramSkill[1].buffer = &skillId;
+
+    if (mysql_stmt_bind_param(stmtSkill, paramSkill)) {
+        cout << "Gagal bind skill special fusion: " << mysql_stmt_error(stmtSkill) << endl;
+        mysql_stmt_close(stmtSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtSkill)) {
+        cout << "Gagal menyimpan skill special fusion: " << mysql_stmt_error(stmtSkill) << endl;
+        mysql_stmt_close(stmtSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtSkill);
+}
+
+string placeholder = "";
+
+for (int i = 0; i < (int)parents.size(); i++) {
+    if (i > 0) {
+        placeholder += ", ";
+    }
+
+    placeholder += "?";
+}
+
+    string deleteSkillQuery =
         "DELETE FROM user_persona_equipped_skills "
-        "WHERE persona_instance_id IN (" + idHapus + ")";
+        "WHERE persona_instance_id IN (" + placeholder + ")";
 
-    if (mysql_query(conn, deleteSkill.c_str())) {
-        cout << "Gagal hapus skill parent special fusion: " << mysql_error(conn) << endl;
+    MYSQL_STMT* stmtDeleteSkill = mysql_stmt_init(conn);
+
+    if (stmtDeleteSkill == NULL) {
+        cout << "Gagal init hapus skill parent special fusion: " << mysql_error(conn) << endl;
         mysql_query(conn, "ROLLBACK");
         return;
     }
 
-    string deleteParents = 
+    if (mysql_stmt_prepare(stmtDeleteSkill, deleteSkillQuery.c_str(), deleteSkillQuery.length())) {
+        cout << "Gagal prepare hapus skill parent special fusion: " << mysql_stmt_error(stmtDeleteSkill) << endl;
+        mysql_stmt_close(stmtDeleteSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    vector<MYSQL_BIND> paramDeleteSkill(parents.size());
+    memset(paramDeleteSkill.data(), 0, sizeof(MYSQL_BIND) * parents.size());
+
+    vector<int> parentIds;
+
+    for (int i = 0; i < (int)parents.size(); i++) {
+        parentIds.push_back(parents[i].id);
+    }
+
+    for (int i = 0; i < (int)parents.size(); i++) {
+        paramDeleteSkill[i].buffer_type = MYSQL_TYPE_LONG;
+        paramDeleteSkill[i].buffer = &parentIds[i];
+    }
+
+    if (mysql_stmt_bind_param(stmtDeleteSkill, paramDeleteSkill.data())) {
+        cout << "Gagal bind hapus skill parent special fusion: " << mysql_stmt_error(stmtDeleteSkill) << endl;
+        mysql_stmt_close(stmtDeleteSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtDeleteSkill)) {
+        cout << "Gagal hapus skill parent special fusion: " << mysql_stmt_error(stmtDeleteSkill) << endl;
+        mysql_stmt_close(stmtDeleteSkill);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtDeleteSkill);
+
+    string deleteParentsQuery =
         "DELETE FROM user_persona_collection "
-        "WHERE user_id = " + to_string(userPtr->id) + " "
-        "AND persona_instance_id IN (" + idHapus + ")";
+        "WHERE user_id = ? "
+        "AND persona_instance_id IN (" + placeholder + ")";
 
-    if (mysql_query(conn, deleteParents.c_str())) {
-        cout << "Gagal hapus parent special fusion: " << mysql_error(conn) << endl;
+    MYSQL_STMT* stmtDeleteParents = mysql_stmt_init(conn);
+
+    if (stmtDeleteParents == NULL) {
+        cout << "Gagal init hapus parent special fusion: " << mysql_error(conn) << endl;
         mysql_query(conn, "ROLLBACK");
         return;
     }
+
+    if (mysql_stmt_prepare(stmtDeleteParents, deleteParentsQuery.c_str(), deleteParentsQuery.length())) {
+        cout << "Gagal prepare hapus parent special fusion: " << mysql_stmt_error(stmtDeleteParents) << endl;
+        mysql_stmt_close(stmtDeleteParents);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    vector<MYSQL_BIND> paramDeleteParents(parents.size() + 1);
+    memset(paramDeleteParents.data(), 0, sizeof(MYSQL_BIND) * (parents.size() + 1));
+
+    paramDeleteParents[0].buffer_type = MYSQL_TYPE_LONG;
+    paramDeleteParents[0].buffer = &userPtr->id;
+
+    for (int i = 0; i < (int)parents.size(); i++) {
+        paramDeleteParents[i + 1].buffer_type = MYSQL_TYPE_LONG;
+        paramDeleteParents[i + 1].buffer = &parentIds[i];
+    }
+
+    if (mysql_stmt_bind_param(stmtDeleteParents, paramDeleteParents.data())) {
+        cout << "Gagal bind hapus parent special fusion: " << mysql_stmt_error(stmtDeleteParents) << endl;
+        mysql_stmt_close(stmtDeleteParents);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_stmt_execute(stmtDeleteParents)) {
+        cout << "Gagal hapus parent special fusion: " << mysql_stmt_error(stmtDeleteParents) << endl;
+        mysql_stmt_close(stmtDeleteParents);
+        mysql_query(conn, "ROLLBACK");
+        return;
+    }
+
+    mysql_stmt_close(stmtDeleteParents);
 
     if (mysql_query(conn, "COMMIT")) {
         cout << "Gagal commit transaksi: " << mysql_error(conn) << endl;
