@@ -39,8 +39,8 @@ void menuAdmin(LevelUser* userPtr, MYSQL* conn) {
                 break;
             case 5: hapusPersona(conn); 
                 break;
-            case 6: sortingPersona(&personaUtama, &status);
-                lihatPersonaUtama();
+            case 6:
+                sortingPersona(&personaUtama);
                 break;
             case 0:
                 cout << "Logout " << (*userPtr).nama << endl; 
@@ -85,8 +85,9 @@ void userMenu(MYSQL* conn, int userIndex) {
                 break; 
             case 5: updateSkillUser(conn, currentUserPtr, currentUserProfilePtr); 
                 break; 
-            case 6: sortingPersona(&(currentUserProfilePtr->listPersona), &(currentUserPtr->status)); 
-                break; 
+           case 6:
+                sortingPersona(&(currentUserProfilePtr->listPersona));
+                break;
             case 7: hapusPersonaUser(conn, currentUserProfilePtr); 
                 break;
             case 8: beliSkill(conn, currentUserPtr, currentUserProfilePtr); 
