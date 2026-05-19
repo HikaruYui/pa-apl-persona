@@ -1,9 +1,6 @@
 # PA APL Persona — Velvet Room
 
-Merupakan refactor dari game persona 3 berbasis CLI dan C++ untuk mengelola data Persona, user, skill, pembelian Persona, pembelian skill card, fusion Persona, dan special fusion. Project ini menggunakan database MariaDB/MySQL sebagai penyimpanan utama.
-
-Project ini dibuat sebagai aplikasi simulasi sistem Persona dengan konsep Velvet Room. User dapat login, membeli Persona, membeli skill card, menggabungkan Persona, memilih skill warisan, melakukan special fusion, dan mengelola koleksi Persona miliknya. Admin dapat mengelola data master Persona, melakukan pencarian, sorting, penambahan, update, dan penghapusan data Persona.
-Data utama seperti user, Persona, arcana, skill, fusion matrix, inventory skill, dan recipe special fusion disimpan di database `persona`.
+Merupakan refactor dari game persona 3 berbasis CLI dan C++ yang dapat mengelola data Persona, user, skill, pembelian Persona, pembelian skill card, fusion Persona, dan special fusion. Project ini menggunakan database MariaDB/MySQL sebagai penyimpanan utama. User dapat login, membeli Persona, membeli skill card, menggabungkan Persona, memilih skill warisan, melakukan special fusion, dan mengelola koleksi Persona miliknya. Admin dapat mengelola data master Persona, melakukan pencarian, sorting, penambahan, update, dan penghapusan data Persona. Data utama seperti user, Persona, arcana, skill, fusion matrix, inventory skill, dan recipe special fusion disimpan di database `persona`.
 
 ## Fitur 
 
