@@ -28,28 +28,33 @@ bool hanyaSpasi(const string& teks) {
 string cekString(const string& prompt) {
     string input;
     
-    while(true) {
+    while (true) {
         try {
             cout << prompt;
             getline(cin, input);
 
             if (input.empty() || hanyaSpasi(input)) {
-                throw invalid_argument("Error: Input tidak boleh kosong");
-            } 
+                throw invalid_argument("Input tidak boleh kosong");
+            }
 
             for (int i = 0; i < (int)input.length(); i++) {
-                if (!isalnum((unsigned char)input[i]) && !isspace((unsigned char) input[i])) {
-                    throw invalid_argument("Input tidak boleh mengandung simbol");
+                char c = input[i];
+
+                if (!isalnum((unsigned char)c) &&
+                    !isspace((unsigned char)c) &&
+                    c != '-' &&
+                    c != '\'') {
+                    throw invalid_argument("Input tidak boleh mengandung simbol selain - dan '");
                 }
             }
 
             return input;
-            }
-            catch (const invalid_argument& e) {
-                cout << "Error: " << e.what() << endl;
-            }
+        }
+        catch (const invalid_argument& e) {
+            cout << "Error: " << e.what() << endl;
         }
     }
+}
 
 string cekString(const string& prompt, bool hanyaHuruf) {
     string input;
@@ -108,13 +113,11 @@ bool spasi(const string& teks) {
     return true;
 }
 
-int cekInteger(const string& prompt){
+int cekInteger(const string& prompt) {
     string input;
 
-    while (true)
-    {
-        try
-        {
+    while (true) {
+        try {
             cout << prompt;
             getline(cin, input);
 
@@ -123,9 +126,13 @@ int cekInteger(const string& prompt){
             }
 
             for (int i = 0; i < input.length(); i++) {
-                if (!isdigit(input[i])) {
+                if (!isdigit((unsigned char)input[i])) {
                     throw invalid_argument("Input harus angka");
                 }
+            }
+
+            if (input.length() > 1 && input[0] == '0') {
+                throw invalid_argument("Input tidak boleh diawali angka 0");
             }
 
             int input_angka = stoi(input);
@@ -137,19 +144,16 @@ int cekInteger(const string& prompt){
             return input_angka;
         }
         catch (const invalid_argument& e) {
-           cout << "error : " << e.what() << endl;
+            cout << "error : " << e.what() << endl;
         }
-        
         catch (const runtime_error& e) {
-           cout << "error : " << e.what() << endl;
+            cout << "error : " << e.what() << endl;
         }
-
         catch (const out_of_range& e) {
-            cout << "error : Angka terlalu besar" << e.what() << endl;
+            cout << "error : Angka terlalu besar" << endl;
         }
     }
 }
-
 
 
 bool cekNamaPersona(const string& name, int excludeIndex = -1) {
