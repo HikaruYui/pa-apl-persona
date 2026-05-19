@@ -28,6 +28,15 @@ bool konfirmasiFuse() {
     return false;
 }
 
+bool hanyaSpasi(const string& teks) {
+    for (int i = 0; i < (int)teks.length(); i++) {
+        if (!isspace((unsigned char)teks[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 string cekString(const string& prompt) {
     string input;
     
@@ -58,7 +67,7 @@ string cekString(const string& prompt, bool hanyaHuruf) {
     string input;
 
     while (true) {
-        try{
+        try {
             cout << prompt;
             getline(cin, input);
 
@@ -66,22 +75,22 @@ string cekString(const string& prompt, bool hanyaHuruf) {
                 throw invalid_argument("Input tidak boleh kosong");
             }
 
-            for (int i = 0; i < input.length(); i++) {
+            for (int i = 0; i < (int)input.length(); i++) {
                 if (hanyaHuruf) {
-                    if (!isalpha(unsigned char)input[i]) && !isspace((unsigned char)input[i]) {
+                    if (!isalpha((unsigned char)input[i]) && !isspace((unsigned char)input[i])) {
                         throw invalid_argument("Input hanya boleh huruf dan spasi");
                     }
-                    else {
-                        if (!isalnum((unsigned char)input[i]) && !isspace((unsigned char)input[i])) {
-                            throw invalid_argument("Input tidak boleh mengandung simbol");
-                        }
+                } else {
+                    if (!isalnum((unsigned char)input[i]) && !isspace((unsigned char)input[i])) {
+                        throw invalid_argument("Input tidak boleh mengandung simbol");
                     }
                 }
-                return input;
             }
-            catch (const invalid_argument& e) {
-                cout << "error: " << e.what() << endl;
-            }
+
+            return input;
+        }
+        catch (const invalid_argument& e) {
+            cout << "error: " << e.what() << endl;
         }
     }
 }
@@ -152,48 +161,6 @@ int cekInteger(const string& prompt){
         }
     }
 }
-
-bool hanyaSpasi(const string& teks) {
-    for (int i = 0; i < (int)teks.length(); i++) {
-        if (!isspace((unsigned char)teks[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool hanyaHurufDanSpasi(const string& input) {
-    for (int i = 0; i < (int)input.length(); i++) {
-        if (!isalpha((unsigned char)input[i]) && !isspace((unsigned char)input[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-string cekStringTanpaAngka(const string& prompt) {
-    string input;
-
-    while (true) {
-        try {
-            cout << prompt;
-            getline(cin, input);
-
-            if (input.empty() || hanyaSpasi(input)) {
-                throw invalid_argument("Input tidak boleh kosong");
-            }
-
-            if (!hanyaHurufDanSpasi(input)) {
-                throw invalid_argument("Arcana hanya boleh huruf dan spasi");
-            }
-            return input;
-        }
-        catch (const invalid_argument& e) {
-            cout << "error: " << e.what() << endl;
-        }
-    }
-}
-
 
 
 bool cekNamaPersona(const string& name, int excludeIndex = -1) {

@@ -7,7 +7,7 @@
 
 void lihatPersonaUtama();
 void cariPersona(vector<persona>* daftarPersona, int* status);
-void sortingPersona(vector<persona>* daftarPersona, int* status);
+void sortingPersona(vector<persona>* daftarPersona);
 
 void bubbleSortNama(vector<persona>* daftarPersona, bool ascending) {
     int sizePersona = daftarPersona->size();
@@ -53,70 +53,32 @@ void insertionSortLevel(vector<persona>* daftarPersona, bool ascending) {
     }
 }
 
-void selectionSortHarga(vector<persona>* daftarPersona, bool ascending) {
-    int sizePersona = daftarPersona->size();
-    for (int i = 0; i < sizePersona - 1; i++) {
-        int targetIndex = i;
-        for (int j = i + 1; j < sizePersona; j++) {
-            if (ascending) {
-                if ((*daftarPersona)[j].harga < (*daftarPersona)[targetIndex].harga) {
-                    targetIndex = j;
-                }
-            } else {
-                 if ((*daftarPersona)[j].harga > (*daftarPersona)[targetIndex].harga) {
-                    targetIndex = j;
-                 }
-            }
-        }
-        if (targetIndex != i) {
-            persona temp = (*daftarPersona)[i];
-            (*daftarPersona)[i] = (*daftarPersona)[targetIndex];
-            (*daftarPersona)[targetIndex] = temp;
-        }
-    }
-}
-
-void sortingPersona(vector<persona>* daftarPersona, int* status) {
-    cout << "\n pilih jenis sorting : " << endl;
+void sortingPersona(vector<persona>* daftarPersona) {
+    cout << "\npilih jenis sorting : " << endl;
     cout << "1. berdasarkan nama(A-Z)" << endl;
     cout << "2. berdasarkan nama(Z-A)" << endl;
     cout << "3. berdasarkan level(terendah ke tertinggi)" << endl;
     cout << "4. berdasarkan level(tertinggi ke terendah)" << endl;
-    if(*status == 1){
-      cout << "5. berdasarkan harga(termurah ke termahal)" << endl;
-      cout << "6. berdasarkan harga(termahal ke termurah)" << endl;  
-    }
 
     int pilihan = cekInteger("pilihan : ");
 
-    if(*status != 1 && (pilihan == 5 || pilihan == 6)){
-        cout << "pilihan tidak valid" << endl;
-        return;
-    }
-        switch (pilihan)
-        {
+    switch (pilihan) {
         case 1:
             bubbleSortNama(daftarPersona, true);
             break;
         case 2:
-            bubbleSortNama(daftarPersona, false); 
+            bubbleSortNama(daftarPersona, false);
             break;
         case 3:
-            insertionSortLevel(daftarPersona, true); 
+            insertionSortLevel(daftarPersona, true);
             break;
         case 4:
-            insertionSortLevel(daftarPersona, false); 
+            insertionSortLevel(daftarPersona, false);
             break;
-        case 5:
-            selectionSortHarga(daftarPersona, true);
-            break;
-        case 6:
-            selectionSortHarga(daftarPersona, false);
-            break;           
         default:
-        cout << "pilihan sorting tidak valid" << endl;
+            cout << "pilihan sorting tidak valid" << endl;
             break;
-        }
+    }
 }
 
 void cariPersona(vector<persona>* daftarPersona, int* status) { 
@@ -280,10 +242,10 @@ void tambahPersona(MYSQL* conn) {
         return;
     }
     newP.level = cekInteger("masukkan level persona : ");
-    newP.arcana = cekStringTanpaAngka("Silakan masukkan arcana persona: ", true);
+    newP.arcana = cekString("Silakan masukkan arcana persona: ");
 
     while (newP.skills.size() < 4) {
-        string inputSkill = cekStringTanpaAngka("Skill " + to_string(newP.skills.size() + 1) + ": ", true);
+        string inputSkill = cekString("Skill " + to_string(newP.skills.size() + 1) + ": ", true);
 
         if (inputSkill == "stop") {
             if (newP.skills.size() >= 2) {
@@ -434,7 +396,7 @@ void updatePersona(MYSQL* conn) {
         }
 
         case 3: {
-            string arcanaBaru = cekStringTanpaAngka("Silakan masukkan arcana baru: ");
+            string arcanaBaru = cekString("Silakan masukkan arcana baru: ");
             int arcanaId = createArcana(conn, arcanaBaru);
 
             if (arcanaId == -1) {
@@ -476,7 +438,7 @@ void updatePersona(MYSQL* conn) {
 
             int idxSkill = nomorSkill - 1;
 
-            string skillBaru = cekStringTanpaAngka("Silakan masukkan nama skill baru: ");
+            string skillBaru = cekString("Silakan masukkan nama skill baru: ");
 
             if (cekSkillPersona(personaUtama[idx].skills, skillBaru, idxSkill)) {
                 cout << "Gagal: Persona ini sudah punya skill tersebut!" << endl;
