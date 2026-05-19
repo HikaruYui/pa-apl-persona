@@ -60,7 +60,7 @@ Data utama seperti user, Persona, arcana, skill, fusion matrix, inventory skill,
 Database yang digunakan bernama:
 
 ```sql
-persona
+persona.sql
 ```
 
 Tabel utama:
@@ -208,7 +208,6 @@ main.exe
 - Aplikasi sebaiknya tetap memakai user database khusus, yaitu `apluser`.
 - Jika import SQL gagal karena tabel sudah ada, reset database terlebih dahulu.
 - Jika program menampilkan `Jumlah user: 0`, cek apakah struktur tabel `inventori_user` sudah memiliki kolom `jumlah_skill_card`.
-- Jika input tiba-tiba dianggap kosong setelah konfirmasi `y/n`, pastikan semua konfirmasi menggunakan `getline()` atau helper `konfirmasiString()`, bukan `cin >>`.
 
 ## Tim Pengembang
 * Diftya Azzahra
