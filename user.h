@@ -93,39 +93,75 @@ vector<string> skillWarisan(persona parent1, persona parent2) {
     return skillDipilih;
 }
 
+// helper 
+
+void lihatPersonaBisaDibeli(vector<int>& indexBisaDibeli) {
+    indexBisaDibeli.clear();
+
+    Table table;
+    table.add_row({"No", "Nama", "Level", "Arcana", "Harga", "Skill"});
+
+    int nomorTampil = 1;
+
+    for (int i = 0; i < (int)personaUtama.size(); i++) {
+        bool bisaDibeli = personaUtama[i].harga > 0 && personaUtama[i].isSpecial == false;
+
+        if (bisaDibeli) {
+            indexBisaDibeli.push_back(i);
+
+            table.add_row({
+                to_string(nomorTampil),
+                personaUtama[i].nama,
+                to_string(personaUtama[i].level),
+                personaUtama[i].arcana,
+                to_string(personaUtama[i].harga),
+                gabungSkill(personaUtama[i].skills)
+            });
+
+            nomorTampil++;
+        }
+    }
+
+    if (indexBisaDibeli.empty()) {
+        cout << "Tidak ada persona yang bisa dibeli." << endl;
+        return;
+    }
+
+    cout << table << endl;
+}
+
 void beliPersona(MYSQL* conn, LevelUser* userPtr, personaUser* profilePtr) {
     try {
-        if (profilePtr->listPersona.size() >= max_persona_user) {
-            throw out_of_range("Batas maksimum persona sudah tercapai");
-        }
+            if (profilePtr->listPersona.size() >= max_persona_user) {
+                throw out_of_range("Batas maksimum persona sudah tercapai");
+            }
 
-        lihatPersonaUtama();
+            vector<int> indexBisaDibeli;
+            lihatPersonaBisaDibeli(indexBisaDibeli);
 
-        int index = cekInteger("Pilih nomor persona yang ingin dibeli (0 untuk batal) : ");
+            if (indexBisaDibeli.empty()) {
+                return;
+            }
 
-        if (index == 0) {
-            cout << "batal membeli" << endl;
-            return;
-        }
+            int pilihanBeli = cekInteger("Pilih nomor persona yang ingin dibeli (0 untuk batal) : ");
 
-        index--;
+            if (pilihanBeli == 0) {
+                cout << "batal membeli" << endl;
+                return;
+            }
 
-        if (index < 0 || index >= (int)personaUtama.size()) {
-            throw out_of_range("Nomor persona tidak valid");
-        }
+            if (pilihanBeli < 1 || pilihanBeli > (int)indexBisaDibeli.size()) {
+                throw out_of_range("Nomor persona tidak valid");
+            }
 
-        persona terbeli = personaUtama[index];
-        terbeli.original_id = personaUtama[index].original_id;
+            int indexAsli = indexBisaDibeli[pilihanBeli - 1];
 
-        // Kalau persona special, tidak boleh dibeli langsung.
-        if (terbeli.isSpecial) {
-            cout << "Persona special tidak bisa dibeli langsung!" << endl;
-            return;
-        }
+            persona terbeli = personaUtama[indexAsli];
+            terbeli.original_id = personaUtama[indexAsli].original_id;
 
-        if (userPtr->uang < terbeli.harga) {
-            throw runtime_error("Uang tidak cukup!");
-        }
+            if (userPtr->uang < terbeli.harga) {
+                throw runtime_error("Uang tidak cukup!");
+            }
 
         // Mulai transaksi karena proses beli persona mengubah beberapa tabel:
         // 1. user_persona_collection
